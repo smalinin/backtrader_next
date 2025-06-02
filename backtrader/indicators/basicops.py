@@ -25,8 +25,6 @@ import functools
 import math
 import operator
 
-from ..utils.py3 import map, range
-
 from . import Indicator
 
 

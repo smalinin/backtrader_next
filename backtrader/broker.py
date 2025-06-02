@@ -18,8 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 from backtrader.comminfo import CommInfoBase
 from backtrader.metabase import MetaParams
@@ -43,7 +42,7 @@ class MetaBroker(MetaParams):
 
         for attr, trans in translations.items():
             if not hasattr(cls, attr):
-                setattr(cls, name, getattr(cls, trans))
+                setattr(cls, attr, getattr(cls, trans))
 
 
 class BrokerBase(with_metaclass(MetaBroker, object)):

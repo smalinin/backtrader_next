@@ -36,7 +36,7 @@ import matplotlib.font_manager as mfontmgr
 import matplotlib.legend as mlegend
 import matplotlib.ticker as mticker
 
-from ..utils.py3 import range, with_metaclass, string_types, integer_types
+from ..utils.py3 import with_metaclass, string_types, integer_types
 from .. import AutoInfoClass, MetaParams, TimeFrame, date2num
 
 from .finance import plot_candlestick, plot_ohlc, plot_volume, plot_lineonclose
@@ -105,7 +105,6 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
             setattr(self.p.scheme, 'locbgother', 'white')
 
     def drawtag(self, ax, x, y, facecolor, edgecolor, alpha=0.9, **kwargs):
-
         txt = ax.text(x, y, '%.2f' % y, va='center', ha='left',
                       fontsize=self.pinf.sch.subtxtsize,
                       bbox=dict(boxstyle=tag_box_style,
@@ -262,7 +261,7 @@ class Plot_OldSync(with_metaclass(MetaParams, object)):
             # Applying the manual rotation with setp cures the problem
             # but the labels from all axis but the last have to be hidden
             for ax in laxis:
-                self.mpyplot.setp(ax.get_xticklabels(), visible=False)
+                self.mpyplot.setp(ax.get_xticklabels(), visible=True) ##?? False)
 
             self.mpyplot.setp(lastax.get_xticklabels(), visible=True,
                               rotation=self.pinf.sch.tickrotation)

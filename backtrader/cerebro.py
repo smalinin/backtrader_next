@@ -18,8 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 import datetime
 import collections
@@ -32,8 +31,7 @@ except AttributeError:  # For old Python versions
     collectionsAbc = collections  # Используем collections.Iterable
 
 import backtrader as bt
-from .utils.py3 import (map, range, zip, with_metaclass, string_types,
-                        integer_types)
+from .utils.py3 import (with_metaclass, string_types, integer_types)
 
 from . import linebuffer
 from . import indicator
@@ -43,8 +41,7 @@ from . import observers
 from .writer import WriterFile
 from .utils import OrderedDict, tzparse, num2date, date2num
 from .strategy import Strategy, SignalStrategy
-from .tradingcal import (TradingCalendarBase, TradingCalendar,
-                         PandasMarketCalendar)
+from .tradingcal import (TradingCalendarBase, TradingCalendar, PandasMarketCalendar)
 from .timer import Timer
 
 # Defined here to make it pickable. Ideally it could be defined inside Cerebro
@@ -91,7 +88,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         If True default Observers will be added: Broker (Cash and Value),
         Trades and BuySell
 
-      - ``oldbuysell`` (default: ``False``)
+      ??- ``oldbuysell`` (default: ``False``)
 
         If ``stdstats`` is ``True`` and observers are getting automatically
         added, this switch controls the main behavior of the ``BuySell``
@@ -106,7 +103,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
           given moment in time is. This will of course be on top of an OHLC bar
           or on a Line on Cloe bar, difficulting the recognition of the plot.
 
-      - ``oldtrades`` (default: ``False``)
+      ??- ``oldtrades`` (default: ``False``)
 
         If ``stdstats`` is ``True`` and observers are getting automatically
         added, this switch controls the main behavior of the ``Trades``
@@ -160,7 +157,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
             - ``runonce`` will be deactivated
 
-      - ``objcache`` (default: ``False``)
+      ?? - ``objcache`` (default: ``False``)
 
         Experimental option to implement a cache of lines objects and reduce
         the amount of them. Example from UltimateOscillator::
@@ -214,7 +211,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         with ``optdatas`` the total gain increases to a total speed-up of
         ``32%`` in an optimization run.
 
-      - ``oldsync`` (default: ``False``)
+      ??- ``oldsync`` (default: ``False``)
 
         Starting with release 1.9.0.99 the synchronization of multiple datas
         (same or different timeframes) has been changed to allow datas of
@@ -270,14 +267,13 @@ class Cerebro(with_metaclass(MetaParams, object)):
         Set to ``False`` for compatibility. May be changed to ``True``
 
     '''
-
     params = (
         ('preload', True),
         ('runonce', True),
         ('maxcpus', None),
         ('stdstats', True),
-        ('oldbuysell', False),
-        ('oldtrades', False),
+#        ('oldbuysell', False),
+#        ('oldtrades', False),
         ('lookahead', 0),
         ('exactbars', False),
         ('optdatas', True),
@@ -286,20 +282,21 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('live', False),
         ('writer', False),
         ('tradehistory', False),
-        ('oldsync', False),
+#        ('oldsync', False),
         ('tz', None),
         ('cheat_on_open', False),
         ('broker_coo', True),
         ('quicknotify', False),
     )
 
-    def __init__(self):
+
+    def __init__(self, broker=None, datas=None):
         self._dolive = False
         self._doreplay = False
         self._dooptimize = False
         self.stores = list()
         self.feeds = list()
-        self.datas = list()
+        self.datas = datas or list()
         self.datasbyname = collections.OrderedDict()
         self.strats = list()
         self.optcbs = list()  # holds a list of callbacks for opt strategies
@@ -317,7 +314,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         self._dataid = itertools.count(1)
 
-        self._broker = BackBroker()
+        self._broker = broker or BackBroker()
         self._broker.cerebro = self
 
         self._tradingcal = None  # TradingCalendar()
@@ -977,16 +974,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         if not plotter:
             from . import plot
-            if self.p.oldsync:
-                plotter = plot.Plot_OldSync(**kwargs)
-            else:
-                plotter = plot.Plot(**kwargs)
-
-        # pfillers = {self.datas[i]: self._plotfillers[i]
-        # for i, x in enumerate(self._plotfillers)}
-
-        # pfillers2 = {self.datas[i]: self._plotfillers2[i]
-        # for i, x in enumerate(self._plotfillers2)}
+            plotter = plot.Plot(**kwargs)
 
         figs = []
         for stratlist in self.runstrats:
@@ -1001,6 +989,43 @@ class Cerebro(with_metaclass(MetaParams, object)):
             plotter.show()
 
         return figs
+
+    def nplot(self, iplot=False, start=None, end=None,
+             width=1000, height=900, **kwargs):
+        '''
+        Plots the strategies inside cerebro
+
+        ``iplot``: if ``True`` and running in a ``notebook`` the charts will be
+        displayed inline
+
+        ``start``: An index to the datetime line array of the strategy or a
+        ``datetime.date``, ``datetime.datetime`` instance indicating the start
+        of the plot
+
+        ``end``: An index to the datetime line array of the strategy or a
+        ``datetime.date``, ``datetime.datetime`` instance indicating the end
+        of the plot
+
+        ``width``: in px of the saved figure
+
+        ``height``: in px of the saved figure
+
+        '''
+        if self._exactbars > 0:
+            return
+
+        # if not plotter:
+        #     from . import plot
+        from . import nplot
+        plotter = nplot.Plot(**kwargs)
+
+        flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
+        plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
+                    width=width, height=height)
+        # for stratlist in self.runstrats:
+        #     for si, strat in enumerate(stratlist):
+        #         plotter.plot(strat, iplot=iplot, start=start, end=end)
+        return
 
     def __call__(self, iterstrat):
         '''
@@ -1204,9 +1229,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 if writer.p.csv:
                     writer.addheaders(wheaders)
 
-        # self._plotfillers = [list() for d in self.datas]
-        # self._plotfillers2 = [list() for d in self.datas]
-
         if not predata:
             for data in self.datas:
                 data.reset()
@@ -1223,8 +1245,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
             except bt.errors.StrategySkipError:
                 continue  # do not add strategy to the mix
 
-            if self.p.oldsync:
-                strat._oldsync = True  # tell strategy to use old clock update
             if self.p.tradehistory:
                 strat.set_tradehistory()
             runstrats.append(strat)
@@ -1235,19 +1255,18 @@ class Cerebro(with_metaclass(MetaParams, object)):
         else:
             tz = tzparse(tz)
 
+        ######################
+        ## MAIN CYCLE
+        ######################
         if runstrats:
             # loop separated for clarity
             defaultsizer = self.sizers.get(None, (None, None, None))
             for idx, strat in enumerate(runstrats):
                 if self.p.stdstats:
                     strat._addobserver(False, observers.Broker)
-                    if self.p.oldbuysell:
-                        strat._addobserver(True, observers.BuySell)
-                    else:
-                        strat._addobserver(True, observers.BuySell,
-                                           barplot=True)
+                    strat._addobserver(True, observers.BuySell, barplot=True)
 
-                    if self.p.oldtrades or len(self.datas) == 1:
+                    if len(self.datas) == 1:
                         strat._addobserver(False, observers.Trades)
                     else:
                         strat._addobserver(False, observers.DataTrades)
@@ -1292,15 +1311,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
                     self._timers.append(timer)
 
             if self._dopreload and self._dorunonce:
-                if self.p.oldsync:
-                    self._runonce_old(runstrats)
-                else:
-                    self._runonce(runstrats)
+                self._runonce(runstrats)
             else:
-                if self.p.oldsync:
-                    self._runnext_old(runstrats)
-                else:
-                    self._runnext(runstrats)
+                self._runnext(runstrats)
 
             for strat in runstrats:
                 strat._stop()
@@ -1373,104 +1386,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 owner = self.runningstrats[0]  # default
 
             owner._addnotification(order, quicknotify=self.p.quicknotify)
-
-    def _runnext_old(self, runstrats):
-        '''
-        Actual implementation of run in full next mode. All objects have its
-        ``next`` method invoke on each data arrival
-        '''
-        data0 = self.datas[0]
-        d0ret = True
-        while d0ret or d0ret is None:
-            lastret = False
-            # Notify anything from the store even before moving datas
-            # because datas may not move due to an error reported by the store
-            self._storenotify()
-            if self._event_stop:  # stop if requested
-                return
-            self._datanotify()
-            if self._event_stop:  # stop if requested
-                return
-
-            d0ret = data0.next()
-            if d0ret:
-                for data in self.datas[1:]:
-                    if not data.next(datamaster=data0):  # no delivery
-                        data._check(forcedata=data0)  # check forcing output
-                        data.next(datamaster=data0)  # retry
-
-            elif d0ret is None:
-                # meant for things like live feeds which may not produce a bar
-                # at the moment but need the loop to run for notifications and
-                # getting resample and others to produce timely bars
-                data0._check()
-                for data in self.datas[1:]:
-                    data._check()
-            else:
-                lastret = data0._last()
-                for data in self.datas[1:]:
-                    lastret += data._last(datamaster=data0)
-
-                if not lastret:
-                    # Only go extra round if something was changed by "lasts"
-                    break
-
-            # Datas may have generated a new notification after next
-            self._datanotify()
-            if self._event_stop:  # stop if requested
-                return
-
-            self._brokernotify()
-            if self._event_stop:  # stop if requested
-                return
-
-            if d0ret or lastret:  # bars produced by data or filters
-                for strat in runstrats:
-                    strat._next()
-                    if self._event_stop:  # stop if requested
-                        return
-
-                    self._next_writers(runstrats)
-
-        # Last notification chance before stopping
-        self._datanotify()
-        if self._event_stop:  # stop if requested
-            return
-        self._storenotify()
-        if self._event_stop:  # stop if requested
-            return
-
-    def _runonce_old(self, runstrats):
-        '''
-        Actual implementation of run in vector mode.
-        Strategies are still invoked on a pseudo-event mode in which ``next``
-        is called for each data arrival
-        '''
-        for strat in runstrats:
-            strat._once()
-
-        # The default once for strategies does nothing and therefore
-        # has not moved forward all datas/indicators/observers that
-        # were homed before calling once, Hence no "need" to do it
-        # here again, because pointers are at 0
-        data0 = self.datas[0]
-        datas = self.datas[1:]
-        for i in range(data0.buflen()):
-            data0.advance()
-            for data in datas:
-                data.advance(datamaster=data0)
-
-            self._brokernotify()
-            if self._event_stop:  # stop if requested
-                return
-
-            for strat in runstrats:
-                # data0.datetime[0] for compat. w/ new strategy's oncepost
-                strat._oncepost(data0.datetime[0])
-                if self._event_stop:  # stop if requested
-                    return
-
-                self._next_writers(runstrats)
 
     def _next_writers(self, runstrats):
         if not self.runwriters:
@@ -1577,9 +1492,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
                     d._check(forcedata=dmaster)  # check to force output
                     if d.next(datamaster=dmaster, ticks=False):  # retry
                         dts[i] = d.datetime[0]  # good -> store
-                        # self._plotfillers2[i].append(slen)  # mark as fill
                     else:
-                        # self._plotfillers[i].append(slen)  # mark as empty
                         pass
 
                 # make sure only those at dmaster level end up delivering
@@ -1590,12 +1503,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
                         if dti > dt0:
                             if not rpi:  # must see all ticks ...
                                 di.rewind()  # cannot deliver yet
-                            # self._plotfillers[i].append(slen)
                         elif not di.replaying:
                             # Replay forces tick fill, else force here
                             di._tick_fill(force=True)
 
-                        # self._plotfillers2[i].append(slen)  # mark as fill
 
             elif d0ret is None:
                 # meant for things like live feeds which may not produce a bar
@@ -1661,8 +1572,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         # has not moved forward all datas/indicators/observers that
         # were homed before calling once, Hence no "need" to do it
         # here again, because pointers are at 0
-        datas = sorted(self.datas,
-                       key=lambda x: (x._timeframe, x._compression))
+        datas = sorted(self.datas, key=lambda x: (x._timeframe, x._compression))
 
         while True:
             # Check next incoming date in the datas
@@ -1673,13 +1583,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
             # Timemaster if needed be
             # dmaster = datas[dts.index(dt0)]  # and timemaster
-            slen = len(runstrats[0])
             for i, dti in enumerate(dts):
                 if dti <= dt0:
                     datas[i].advance()
-                    # self._plotfillers2[i].append(slen)  # mark as fill
                 else:
-                    # self._plotfillers[i].append(slen)
                     pass
 
             self._check_timers(runstrats, dt0, cheat=True)

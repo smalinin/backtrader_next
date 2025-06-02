@@ -25,7 +25,7 @@ import datetime as _datetime
 from datetime import datetime
 import inspect
 
-from .utils.py3 import range, with_metaclass
+#from .utils.py3 import with_metaclass
 from .lineseries import LineSeries
 from .utils import AutoOrderedDict, OrderedDict, date2num
 
@@ -118,9 +118,9 @@ class SimpleFilterWrapper(object):
 
     Filters are callables which
 
-      - Take a ``data`` as an argument
-      - Return False if the current bar has not triggered the filter
-      - Return True if the current bar must be filtered
+    - Take a ``data`` as an argument
+    - Return False if the current bar has not triggered the filter
+    - Return True if the current bar must be filtered
 
     The wrapper takes the return value and executes the bar removal
     if needed be
@@ -142,7 +142,7 @@ class SimpleFilterWrapper(object):
 
         return False
 
-
+##?? checkme dropme
 class _Bar(AutoOrderedDict):
     '''
     This class is a placeholder for the values of the standard lines of a

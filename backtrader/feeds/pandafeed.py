@@ -18,13 +18,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+# from __future__ import (absolute_import, division, print_function, unicode_literals)
 
-from backtrader.utils.py3 import filter, string_types, integer_types
+from backtrader.utils.py3 import string_types, integer_types
 
 from backtrader import date2num
 import backtrader.feed as feed
+
+import numpy as np
 
 
 class PandasDirectData(feed.DataBase):
@@ -37,9 +38,9 @@ class PandasDirectData(feed.DataBase):
 
     Note:
 
-      - The ``dataname`` parameter is a Pandas DataFrame
+    - The ``dataname`` parameter is a Pandas DataFrame
 
-      - A negative value in any of the parameters for the Data lines
+    - A negative value in any of the parameters for the Data lines
         indicates it's not present in the DataFrame
         it is
     '''
@@ -268,6 +269,43 @@ class PandasData(feed.DataBase):
         dt = tstamp.to_pydatetime()
         dtnum = date2num(dt)
         self.lines.datetime[0] = dtnum
+
+        # Done ... return
+        return True
+
+    def _preload(self):
+        df_len = len(self.p.dataname)
+
+        # Set the standard datafields
+        for datafield in self.getlinealiases():
+            if datafield == 'datetime':
+                continue
+
+            # get the line to be set
+            line = getattr(self.lines, datafield)
+
+            colindex = self._colmapping[datafield]
+            if colindex is None:
+                # datafield signaled as missing in the stream: create array with nan
+                line.ndbuffer(np.full(df_len, np.nan, dtype=np.double))
+            else:
+                # indexing for pandas: 1st is colum, then row
+                ds = self.p.dataname.iloc[:, colindex]
+                line.ndbuffer(np.asarray(ds))
+
+        # datetime conversion
+        coldtime = self._colmapping['datetime']
+
+        if coldtime is None:
+            # standard index in the datetime
+            tstamp = self.p.dataname.index
+        else:
+            # it's in a different column ... use standard column index
+            tstamp = self.p.dataname.iloc[:, coldtime]
+
+        # convert to float via datetime and store it
+        dt = tstamp.to_pydatetime()
+        self.lines.datetime.ndbuffer(np.array([date2num(v) for v in dt]))
 
         # Done ... return
         return True

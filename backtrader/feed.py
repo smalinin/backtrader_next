@@ -18,8 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+#from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 import collections
 import datetime
@@ -31,7 +30,7 @@ import backtrader as bt
 from backtrader import (date2num, num2date, time2num, TimeFrame, dataseries,
                         metabase)
 
-from backtrader.utils.py3 import with_metaclass, zip, range, string_types
+from backtrader.utils.py3 import with_metaclass, string_types
 from backtrader.utils import tzparse
 from .dataseries import SimpleFilterWrapper
 from .resamplerfilter import Resampler, Replayer
@@ -48,15 +47,14 @@ class MetaAbstractDataBase(dataseries.OHLCDateTime.__class__):
         # Initialize the class
         super(MetaAbstractDataBase, cls).__init__(name, bases, dct)
 
-        if not cls.aliased and \
-           name != 'DataBase' and not name.startswith('_'):
+        if not cls.aliased and name != 'DataBase' and not name.startswith('_'):
             cls._indcol[name] = cls
 
     def dopreinit(cls, _obj, *args, **kwargs):
         _obj, args, kwargs = \
             super(MetaAbstractDataBase, cls).dopreinit(_obj, *args, **kwargs)
 
-        # Find the owner and store it
+        # Find the owner and store it   ##??  CHECK me may be DROP
         _obj._feed = metabase.findowner(_obj, FeedBase)
 
         _obj.notifs = collections.deque()  # store notifications for cerebro
@@ -87,7 +85,7 @@ class MetaAbstractDataBase(dataseries.OHLCDateTime.__class__):
 
         elif _obj.p.sessionend is None:
             # remove 9 to avoid precision rounding errors
-            _obj.p.sessionend = datetime.time(23, 59, 59, 999990)
+            _obj.p.sessionend = datetime.time(23, 59, 59, 999900)
 
         if isinstance(_obj.p.fromdate, datetime.date):
             # push it to the end of the day, or else intraday
@@ -119,8 +117,7 @@ class MetaAbstractDataBase(dataseries.OHLCDateTime.__class__):
         return _obj, args, kwargs
 
 
-class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
-                                      dataseries.OHLCDateTime)):
+class AbstractDataBase(with_metaclass(MetaAbstractDataBase, dataseries.OHLCDateTime)):
 
     params = (
         ('dataname', None),
@@ -139,7 +136,7 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
     )
 
     (CONNECTED, DISCONNECTED, CONNBROKEN, DELAYED,
-     LIVE, NOTSUBSCRIBED, NOTSUPPORTED_TF, UNKNOWN) = range(8)
+    LIVE, NOTSUBSCRIBED, NOTSUPPORTED_TF, UNKNOWN) = range(8)
 
     _NOTIFNAMES = [
         'CONNECTED', 'DISCONNECTED', 'CONNBROKEN', 'DELAYED',
@@ -344,27 +341,49 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
 
         self._compensate = other
 
-    def _tick_nullify(self):
+    # def _tick_nullify(self):  #?? OLD ver SLOW
+    #     # These are the updating prices in case the new bar is "updated"
+    #     # and the length doesn't change like if a replay is happening or
+    #     # a real-time data feed is in use and 1 minutes bars are being
+    #     # constructed with 5 seconds updates
+    #     for lalias in self.getlinealiases():
+    #         if lalias != 'datetime':
+    #             setattr(self, 'tick_' + lalias, None)
+
+    #     self.tick_last = None
+
+    def _tick_nullify(self):  #Fixed VER
         # These are the updating prices in case the new bar is "updated"
         # and the length doesn't change like if a replay is happening or
         # a real-time data feed is in use and 1 minutes bars are being
         # constructed with 5 seconds updates
-        for lalias in self.getlinealiases():
-            if lalias != 'datetime':
-                setattr(self, 'tick_' + lalias, None)
-
+        self.tick_close = None
+        self.tick_low = None
+        self.tick_high = None
+        self.tick_open = None
+        self.tick_volume = None
         self.tick_last = None
 
-    def _tick_fill(self, force=False):
-        # If nothing filled the tick_xxx attributes, the bar is the tick
-        alias0 = self._getlinealias(0)
-        if force or getattr(self, 'tick_' + alias0, None) is None:
-            for lalias in self.getlinealiases():
-                if lalias != 'datetime':
-                    setattr(self, 'tick_' + lalias,
-                            getattr(self.lines, lalias)[0])
+    # def _tick_fill(self, force=False): #?? OLD ver SLOW
+    #     # If nothing filled the tick_xxx attributes, the bar is the tick
+    #     alias0 = self._getlinealias(0)
+    #     if force or getattr(self, 'tick_' + alias0, None) is None:
+    #         for lalias in self.getlinealiases():
+    #             if lalias != 'datetime':
+    #                 setattr(self, 'tick_' + lalias,
+    #                         getattr(self.lines, lalias)[0])
 
-            self.tick_last = getattr(self.lines, alias0)[0]
+    #         self.tick_last = getattr(self.lines, alias0)[0]
+
+    def _tick_fill(self, force=False): #Fixed VER
+        # If nothing filled the tick_xxx attributes, the bar is the tick
+        if force or self.tick_close is None:
+            self.tick_close = self.lines.close[0]
+            self.tick_low = self.lines.low[0]
+            self.tick_high = self.lines.high[0]
+            self.tick_open = self.lines.open[0]
+            self.tick_volume = self.lines.volume[0]
+            self.tick_last = self.lines.close[0]
 
     def advance_peek(self):
         if len(self) < self.buflen():
@@ -435,7 +454,13 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
         # tell the world there is a bar (either the new or the previous
         return True
 
+    ##?? TODO FIXME
     def preload(self):
+        if len(self._ffilters)==0 and len(self._filters)==0:
+            if self._preload():  #?? Fixme Use TZ Input from load()  fromdate and todata
+                self.home()
+                return
+
         while self.load():
             pass
 
@@ -536,6 +561,9 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
         return False
 
     def _load(self):
+        return False
+
+    def _preload(self):
         return False
 
     def _add2stack(self, bar, stash=False):

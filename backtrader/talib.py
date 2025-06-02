@@ -18,8 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 # The modules below should/must define __all__ with the objects wishes
 # or prepend an "_" (underscore) to private classes/variables
@@ -198,16 +197,16 @@ else:
             fsize = self.size()
             lsize = fsize - self._iscandle
             if lsize == 1:  # only 1 output, no tuple returned
-                self.lines[0].array = array.array(str('d'), output)
+                self.lines[0].array = array.array(str('d'), output)  ##?? TO replace with np.asarray(output)
 
                 if fsize > lsize:  # candle is present
                     candleref = narrays[self.CANDLEREF] * self.CANDLEOVER
                     output2 = candleref * (output / 100.0)
-                    self.lines[1].array = array.array(str('d'), output2)
+                    self.lines[1].array = array.array(str('d'), output2)  ##?? TO replace with np.asarray()
 
             else:
                 for i, o in enumerate(output):
-                    self.lines[i].array = array.array(str('d'), o)
+                    self.lines[i].array = array.array(str('d'), o)  ##?? TO replace with np.asarray()
 
         def next(self):
             # prepare the data arrays - single shot

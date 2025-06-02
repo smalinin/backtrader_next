@@ -25,7 +25,7 @@ import collections
 import operator
 import sys
 
-from .utils.py3 import map, range, zip, with_metaclass, string_types
+from .utils.py3 import with_metaclass, string_types
 from .utils import DotDict
 
 from .lineroot import LineRoot, LineSingle

@@ -37,7 +37,9 @@ import datetime
 from itertools import islice
 import math
 
-from .utils.py3 import range, with_metaclass, string_types
+from backtrader.errors import BacktraderError
+
+from .utils.py3 import with_metaclass, string_types
 
 from .lineroot import LineRoot, LineSingle, LineMultiple
 from . import metabase
@@ -70,7 +72,7 @@ class LineBuffer(LineSingle):
     it will also be set in the binding.
     '''
 
-    UnBounded, QBuffer = (0, 1)
+    UnBounded, QBuffer, NDBuffer = (0, 1, 2)
 
     def __init__(self):
         self.lines = [self]
@@ -110,6 +112,8 @@ class LineBuffer(LineSingle):
             # allows the forward without removing that bar
             self.array = collections.deque(maxlen=self.maxlen + self.extrasize)
             self.useislice = True
+        elif self.mode == self.NDBuffer:
+            self.useislice = False
         else:
             self.array = array.array(str('d'))
             self.useislice = False
@@ -123,6 +127,17 @@ class LineBuffer(LineSingle):
         self.maxlen = self._minperiod
         self.extrasize = extrasize
         self.lenmark = self.maxlen - (not self.extrasize)
+        self.reset()
+
+    def ndbuffer(self, arr=None): 
+        self.mode = self.NDBuffer
+        if arr is not None:
+            self.array = arr
+        self.maxlen = self._minperiod
+        self.extrasize = 0
+        self.lenmark = self.maxlen - (not self.extrasize)
+        self.idx = -1
+        self.lencount = 0
         self.reset()
 
     def getindicators(self):
@@ -160,7 +175,12 @@ class LineBuffer(LineSingle):
         return len(self.array) - self.extension
 
     def __getitem__(self, ago):
-        return self.array[self.idx + ago]
+        #pos = self._idx+ago      #??TODO
+        #if se<0:
+        #    raise BacktraderError(f'array index {pos} out of bounds')
+        #if self._idx>=0 and ago>1:
+        #    raise BacktraderError(f'Could not get data from future')
+        return self.array[self._idx + ago]
 
     def get(self, ago=0, size=1):
         ''' Returns a slice of the array relative to *ago*

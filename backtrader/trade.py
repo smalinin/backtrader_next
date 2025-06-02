@@ -25,7 +25,6 @@ import itertools
 
 from .utils import AutoOrderedDict
 from .utils.date import num2date
-from .utils.py3 import range
 
 
 class TradeHistory(AutoOrderedDict):

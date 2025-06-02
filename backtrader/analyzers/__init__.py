@@ -36,6 +36,8 @@ from .transactions import *
 from .pyfolio import *
 from .returns import *
 from .vwr import *
+from .eq import *
+#from .eq_all import *
 
 from .logreturnsrolling import *
 

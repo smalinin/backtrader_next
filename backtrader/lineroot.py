@@ -33,10 +33,9 @@ from __future__ import (absolute_import, division, print_function,
 
 import operator
 
-from .utils.py3 import range, with_metaclass
+from .utils.py3 import with_metaclass
 
 from . import metabase
-
 
 class MetaLineRoot(metabase.MetaParams):
     '''

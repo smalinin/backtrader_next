@@ -26,8 +26,7 @@ from datetime import date, datetime
 import io
 import itertools
 
-from ..utils.py3 import (urlopen, urlquote, ProxyHandler, build_opener,
-                         install_opener)
+from ..utils.py3 import (urlopen, urlquote, build_opener, install_opener)
 
 from .. import feed
 from ..utils import date2num

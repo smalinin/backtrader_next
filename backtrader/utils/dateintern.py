@@ -24,6 +24,8 @@ from __future__ import (absolute_import, division, print_function,
 import datetime
 import math
 import time as _time
+from zoneinfo import ZoneInfo
+from typing import Literal, Union
 
 from .py3 import string_types
 
@@ -238,3 +240,17 @@ def time2num(tm):
            tm.microsecond / MUSECONDS_PER_DAY)
 
     return num
+
+def format_datetime(dt: datetime, tz: Union[str, ZoneInfo] = None) -> str:
+    if tz is None:
+        # tz = ZoneInfo(get_localzone_name())
+        return dt.strftime('%Y-%m-%d %H:%M')
+    elif isinstance(tz, str):
+        tz = ZoneInfo(tz)
+    # If dt does not contain tzinfo, assume it is in the specified zone
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=tz)
+    else:
+        # Convert datetime to the required timezone
+        dt = dt.astimezone(tz)
+    return dt.strftime('%Y-%m-%d %H:%M GMT%z')

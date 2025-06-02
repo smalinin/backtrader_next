@@ -26,7 +26,7 @@ from copy import copy
 import datetime
 import itertools
 
-from .utils.py3 import range, with_metaclass, iteritems
+from .utils.py3 import with_metaclass, iteritems
 
 from .metabase import MetaParams
 from .utils import AutoOrderedDict

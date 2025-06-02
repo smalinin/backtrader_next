@@ -30,7 +30,7 @@ from itertools import islice
 from .feed import AbstractDataBase
 from .metabase import MetaParams
 from .utils import date2num, num2date
-from .utils.py3 import integer_types, range, with_metaclass
+from .utils.py3 import integer_types, with_metaclass
 from .utils import TIME_MAX
 
 

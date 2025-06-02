@@ -316,7 +316,7 @@ class BackBroker(bt.BrokerBase):
         self.p.coc = coc
 
     def set_coo(self, coo):
-        '''Configure the Cheat-On-Open method to buy the close on order bar'''
+        '''Configure the Cheat-On-Open method to buy the open on order bar'''
         self.p.coo = coo
 
     def set_shortcash(self, shortcash):
@@ -1040,16 +1040,30 @@ class BackBroker(bt.BrokerBase):
     def _try_exec(self, order):
         data = order.data
 
-        popen = getattr(data, 'tick_open', None)
+        #?? OLD SLOW
+        # popen = getattr(data, 'tick_open', None)
+        # if popen is None:
+        #     popen = data.open[0]
+        # phigh = getattr(data, 'tick_high', None)
+        # if phigh is None:
+        #     phigh = data.high[0]
+        # plow = getattr(data, 'tick_low', None)
+        # if plow is None:
+        #     plow = data.low[0]
+        # pclose = getattr(data, 'tick_close', None)
+        # if pclose is None:
+        #     pclose = data.close[0]
+
+        popen = data.tick_open
         if popen is None:
             popen = data.open[0]
-        phigh = getattr(data, 'tick_high', None)
+        phigh = data.tick_high
         if phigh is None:
             phigh = data.high[0]
-        plow = getattr(data, 'tick_low', None)
+        plow = data.tick_low
         if plow is None:
             plow = data.low[0]
-        pclose = getattr(data, 'tick_close', None)
+        pclose = data.tick_close
         if pclose is None:
             pclose = data.close[0]
 

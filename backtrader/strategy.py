@@ -18,8 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import (absolute_import, division, print_function,  unicode_literals)
 
 import collections
 import copy
@@ -28,8 +27,8 @@ import inspect
 import itertools
 import operator
 
-from .utils.py3 import (filter, keys, integer_types, iteritems, itervalues,
-                        map, MAXINT, string_types, with_metaclass)
+from .utils.py3 import (keys, integer_types, iteritems, itervalues,
+                        MAXINT, string_types, with_metaclass)
 
 import backtrader as bt
 from .lineiterator import LineIterator, StrategyBase
@@ -574,7 +573,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         if quicknotify:
             self._notify(qorders=qorders, qtrades=qtrades)
 
-    def _notify(self, qorders=[], qtrades=[]):
+    def _notify(self, qorders=[], qtrades=[]):  ##??TODO OPTIMIZE for's
         if self.cerebro.p.quicknotify:
             # need to know if quicknotify is on, to not reprocess pendingorders
             # and pendingtrades, which have to exist for things like observers
