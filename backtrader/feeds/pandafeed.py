@@ -135,6 +135,7 @@ class PandasData(feed.DataBase):
     '''
 
     params = (
+        ('dataframe', None),
         ('nocase', True),
 
         # Possible values for datetime (must always be present)
@@ -164,8 +165,10 @@ class PandasData(feed.DataBase):
     def __init__(self):
         super(PandasData, self).__init__()
 
+        if self.p.dataframe is None:
+            raise ValueError("Missing required parameter 'dataframe'.")
         # these "colnames" can be strings or numeric types
-        colnames = list(self.p.dataname.columns.values)
+        colnames = list(self.p.dataframe.columns.values)
         if self.p.datetime is None:
             # datetime is expected as index col and hence not returned
             pass
@@ -210,9 +213,9 @@ class PandasData(feed.DataBase):
 
         # Transform names (valid for .ix) into indices (good for .iloc)
         if self.p.nocase:
-            colnames = [x.lower() for x in self.p.dataname.columns.values]
+            colnames = [x.lower() for x in self.p.dataframe.columns.values]
         else:
-            colnames = [x for x in self.p.dataname.columns.values]
+            colnames = [x for x in self.p.dataframe.columns.values]
 
         for k, v in self._colmapping.items():
             if v is None:
@@ -235,7 +238,7 @@ class PandasData(feed.DataBase):
     def _load(self):
         self._idx += 1
 
-        if self._idx >= len(self.p.dataname):
+        if self._idx >= len(self.p.dataframe):
             # exhausted all rows
             return False
 
@@ -253,17 +256,17 @@ class PandasData(feed.DataBase):
             line = getattr(self.lines, datafield)
 
             # indexing for pandas: 1st is colum, then row
-            line[0] = self.p.dataname.iloc[self._idx, colindex]
+            line[0] = self.p.dataframe.iloc[self._idx, colindex]
 
         # datetime conversion
         coldtime = self._colmapping['datetime']
 
         if coldtime is None:
             # standard index in the datetime
-            tstamp = self.p.dataname.index[self._idx]
+            tstamp = self.p.dataframe.index[self._idx]
         else:
             # it's in a different column ... use standard column index
-            tstamp = self.p.dataname.iloc[self._idx, coldtime]
+            tstamp = self.p.dataframe.iloc[self._idx, coldtime]
 
         # convert to float via datetime and store it
         dt = tstamp.to_pydatetime()
@@ -274,7 +277,7 @@ class PandasData(feed.DataBase):
         return True
 
     def _preload(self):
-        df_len = len(self.p.dataname)
+        df_len = len(self.p.dataframe)
 
         # Set the standard datafields
         for datafield in self.getlinealiases():
@@ -290,7 +293,7 @@ class PandasData(feed.DataBase):
                 line.ndbuffer(np.full(df_len, np.nan, dtype=np.double))
             else:
                 # indexing for pandas: 1st is colum, then row
-                ds = self.p.dataname.iloc[:, colindex]
+                ds = self.p.dataframe.iloc[:, colindex]
                 line.ndbuffer(np.asarray(ds))
 
         # datetime conversion
@@ -298,10 +301,10 @@ class PandasData(feed.DataBase):
 
         if coldtime is None:
             # standard index in the datetime
-            tstamp = self.p.dataname.index
+            tstamp = self.p.dataframe.index
         else:
             # it's in a different column ... use standard column index
-            tstamp = self.p.dataname.iloc[:, coldtime]
+            tstamp = self.p.dataframe.iloc[:, coldtime]
 
         # convert to float via datetime and store it
         dt = tstamp.to_pydatetime()
