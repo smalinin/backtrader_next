@@ -266,9 +266,11 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
 
         if self._ltype == LineIterator.StratType:
             # supporting datas with different lengths
-            minperstatus = self._getminperstatus()
-            if minperstatus < 0:
-                self.next()
+            minperstatus, dlens = self._getminperstatus()
+            ##---fixed---##
+            any_status = any(x < 0 for x in dlens)
+            if minperstatus < 0 or any_status:
+                self.next(dlens)
             elif minperstatus == 0:
                 self.nextstart()  # only called for the 1st value
             else:
@@ -346,7 +348,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
         # Called once for 1st full calculation - defaults to regular next
         self.next()
 
-    def next(self):
+    def next(self, ready=None):
         '''
         This method will be called for all remaining data points when the
         minimum period for all datas/indicators have been meet.

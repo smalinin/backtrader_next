@@ -266,9 +266,9 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
     def _getminperstatus(self):
         # check the min period status connected to datas
-        dlens = map(operator.sub, self._minperiods, map(len, self.datas))
+        dlens = list(map(operator.sub, self._minperiods, map(len, self.datas)))
         self._minperstatus = minperstatus = max(dlens)
-        return minperstatus
+        return minperstatus, dlens
 
     def prenext_open(self):
         pass
@@ -303,9 +303,12 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self.lines.datetime[0] = dt
         self._notify()
 
-        minperstatus = self._getminperstatus()
-        if minperstatus < 0:
-            self.next()
+        minperstatus, dlens = self._getminperstatus() ## Get the minimum period status and data lengths
+        ##---fixed---##
+        any_status = any(x < 0 for x in dlens)
+        if minperstatus < 0 or any_status:
+        # if minperstatus < 0:
+            self.next(dlens)
         elif minperstatus == 0:
             self.nextstart()  # only called for the 1st value
         else:
@@ -345,7 +348,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
     def _next(self):
         super(Strategy, self)._next()
 
-        minperstatus = self._getminperstatus()
+        minperstatus, dlens = self._getminperstatus()
         self._next_analyzers(minperstatus)
         self._next_observers(minperstatus)
 
