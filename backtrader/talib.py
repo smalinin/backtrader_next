@@ -189,8 +189,11 @@ else:
         def once(self, start, end):
             import array
 
+            if end-start==1:
+                pass
+
             # prepare the data arrays - single shot
-            narrays = [np.array(x.lines[0].array) for x in self.datas]
+            narrays = [np.asarray(x.lines[0].array) for x in self.datas]
             # Execute
             output = self._tafunc(*narrays, **self.p._getkwargs())
 
