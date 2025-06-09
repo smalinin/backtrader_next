@@ -63,13 +63,14 @@ class Plot(with_metaclass(MetaParams, object)):
         self.chart = None
 
     def plot(self, stratlist, iplot=False,
-             start=None, end=None, width=None, height=None, **kwargs):
+             start=None, end=None, width=None, height=None, show_eq=False, **kwargs):
         for strategy in stratlist:
             if not isinstance(strategy, Strategy):
                 raise TypeError(f"Expected Strategy instance, got {type(strategy)}")
             else:
                 self.plot_one(strategy, iplot=iplot,
-                              start=start, end=end, width=width, height=height, **kwargs)
+                            start=start, end=end, width=width, height=height,
+                            show_eq=show_eq, **kwargs)
 
         if self.chart:
             self.chart.load()
@@ -80,7 +81,7 @@ class Plot(with_metaclass(MetaParams, object)):
 
 
     def plot_one(self, strategy, iplot=False,
-             start=None, end=None, width=None, height=None, **kwargs):
+            start=None, end=None, width=None, height=None, show_eq=False,**kwargs):
 
         if not strategy.datas:
             return
@@ -138,20 +139,21 @@ class Plot(with_metaclass(MetaParams, object)):
 
         c_top = {}
         if self.performance:
-            df = self.performance.gen_eq_dd()
-            df['equity_pct'] = (df['Equity'] / df['Equity'].iloc[0] - 1) * 100
-            c_top['eq'] = {'label':'Equity',
-                'mode':'plot',
-                'data':{'time':df.index.to_pydatetime(), 'Equity':df['equity_pct'].to_numpy()}
-                }
-            c_top['eq0'] = {'label':'Equity',
-                'mode':'plot',
-                'data':{'time':df.index.to_pydatetime(), 'Equity':df['Equity'].to_numpy()}
-                }
-            c_top['dd'] = {'label':'Drawdown',
-                'mode':'plot',
-                'data':{'time':df.index, 'Drawdown':df['DrawdownPct'].to_numpy() * -1.0}
-                }
+            if show_eq:
+                df = self.performance.gen_eq_dd()
+                df['equity_pct'] = (df['Equity'] / df['Equity'].iloc[0] - 1) * 100
+                c_top['eq'] = {'label':'Equity',
+                    'mode':'plot',
+                    'data':{'time':df.index.to_pydatetime(), 'Equity':df['equity_pct'].to_numpy()}
+                    }
+                c_top['eq0'] = {'label':'Equity',
+                    'mode':'plot',
+                    'data':{'time':df.index.to_pydatetime(), 'Equity':df['Equity'].to_numpy()}
+                    }
+                c_top['dd'] = {'label':'Drawdown',
+                    'mode':'plot',
+                    'data':{'time':df.index, 'Drawdown':df['DrawdownPct'].to_numpy() * -1.0}
+                    }
             self.performance_metrics = self.performance.compute_stats()
 
         #     self.plotind(None, ptop, subinds=self.dplots_over[ptop])
@@ -264,6 +266,7 @@ class Plot(with_metaclass(MetaParams, object)):
                             inner_height=-300 if c_top else -500)
         chart.legend(visible=True)
         chart.price_scale(perm_width=100)
+        chart.fit()
         return chart
 
     def show(self, chart, xdates, c_top, c_up, c_data, c_down, strat_name, data_name):
@@ -276,6 +279,7 @@ class Plot(with_metaclass(MetaParams, object)):
             self.chart.set_performance_metrics(self.performance_metrics, strat_name)
         chart.new_window()
         chart.legend(visible=True)
+        chart.fit()
         chart.price_scale(perm_width=100)
 
     def draw_main(self, chart, xdates, c_top:{}, c_up, c_data, c_down, data_name):
