@@ -133,7 +133,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         '''
         if savemem < 0:
             # Get any attribute which labels itself as Indicator
-            for ind in self._lineiterators[self.IndType]:
+            for ind in self._ind_iterator:
                 subsave = isinstance(ind, (LineSingle,))
                 if not subsave and savemem < -1:
                     subsave = not ind.plotinfo.plot
@@ -147,15 +147,18 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                 line.qbuffer(savemem=1)
 
             # Save in all object types depending on the strategy
-            for itcls in self._lineiterators:
-                for it in self._lineiterators[itcls]:
-                    it.qbuffer(savemem=1)
+            for it in self._ind_iterator:
+                it.qbuffer(savemem=1)
+            for it in self._obs_iterator:
+                it.qbuffer(savemem=1)
+            for it in self._strat_iterator:
+                it.qbuffer(savemem=1)
 
     def _periodset(self):
         dataids = [id(data) for data in self.datas]
 
         _dminperiods = collections.defaultdict(list)
-        for lineiter in self._lineiterators[LineIterator.IndType]:
+        for lineiter in self._ind_iterator:
             # if multiple datas are used and multiple timeframes the larger
             # timeframe may place larger time constraints in calling next.
             clk = getattr(lineiter, '_clock', None)
@@ -209,8 +212,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             self._minperiods.append(dminperiod)
 
         # Set the minperiod
-        minperiods = \
-            [x._minperiod for x in self._lineiterators[LineIterator.IndType]]
+        minperiods = [x._minperiod for x in self._ind_iterator]
         self._minperiod = max(minperiods or [self._minperiod])
 
     def _addwriter(self, writer):
@@ -289,16 +291,12 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             self.prenext_open()
 
     def _oncepost(self, dt):
-        for indicator in self._lineiterators[LineIterator.IndType]:
-            if len(indicator._clock) > len(indicator):
-                indicator.advance()
+        for indicator in self._ind_iterator:
+            # if len(indicator._clock) > len(indicator):  ##?? duplicated it is checked already in indicator.advance()
+            indicator.advance()
 
-        if self._oldsync:
-            # Strategy has not been reset, the line is there
-            self.advance()
-        else:
-            # strategy has been reset to beginning. advance step by step
-            self.forward()
+        # strategy has been reset to beginning. advance step by step
+        self.forward()
 
         self.lines.datetime[0] = dt
         self._notify()
@@ -355,7 +353,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self.clear()
 
     def _next_observers(self, minperstatus, once=False):
-        for observer in self._lineiterators[LineIterator.ObsType]:
+        for observer in self._obs_iterator:
             for analyzer in observer._analyzers:
                 if minperstatus < 0:
                     analyzer._next()

@@ -461,7 +461,8 @@ class LineSeries(with_metaclass(MetaLineSeries, LineMultiple)):
         return getattr(self.lines, name)
 
     def __len__(self):
-        return len(self.lines)
+        #?? return len(self.lines)
+        return len(self.lines[0])
 
     def __getitem__(self, key):
         return self.lines[0][key]

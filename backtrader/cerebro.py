@@ -1574,6 +1574,12 @@ class Cerebro(with_metaclass(MetaParams, object)):
         # here again, because pointers are at 0
         datas = sorted(self.datas, key=lambda x: (x._timeframe, x._compression))
 
+        # Local references for speed
+        brokernotify = self._brokernotify
+        check_timers = self._check_timers
+        next_writers = self._next_writers
+        cheat_on_open = self.p.cheat_on_open
+        
         while True:
             # Check next incoming date in the datas
             dts = [d.advance_peek() for d in datas]
@@ -1589,26 +1595,29 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 else:
                     pass
 
-            self._check_timers(runstrats, dt0, cheat=True)
-
-            if self.p.cheat_on_open:
+            # Timers before broker (cheat)
+            check_timers(runstrats, dt0, cheat=True)
+            if cheat_on_open:
                 for strat in runstrats:
                     strat._oncepost_open()
                     if self._event_stop:  # stop if requested
                         return
 
-            self._brokernotify()
-            if self._event_stop:  # stop if requested
+            # Broker notifications
+            brokernotify()
+            if self._event_stop:
                 return
 
-            self._check_timers(runstrats, dt0, cheat=False)
+            # Timers after broker
+            check_timers(runstrats, dt0, cheat=False)
 
+            # Strategy once-post and writer updates
             for strat in runstrats:
                 strat._oncepost(dt0)
                 if self._event_stop:  # stop if requested
                     return
 
-                self._next_writers(runstrats)
+                next_writers(runstrats)
 
     def _check_timers(self, runstrats, dt0, cheat=False):
         timers = self._timers if not cheat else self._timerscheat

@@ -68,6 +68,7 @@ from . import utils as utils
 from . import feeds as feeds
 from . import indicators as indicators
 from . import indicators as ind
+from . import nind as nind
 from . import studies as studies
 from . import strategies as strategies
 from . import strategies as strats
