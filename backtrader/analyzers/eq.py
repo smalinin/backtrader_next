@@ -133,14 +133,17 @@ class Eq(bt.Analyzer):
 
         return equity_df
 
-    def gen_trades(self, data_name=None) -> 'DataFrame':
+    def gen_trades(self, data_name=None, pct=False) -> 'DataFrame':
         if self.trades_df is None:
             self.trades_df = df.from_records(self.trades, columns=self.trades_header)
             # self.trades_df = df.from_records(self.trades, index=self.trades_header[0], columns=self.trades_header)
         if data_name is None:
-            return self.trades_df
+            rdf = self.trades_df.copy()
         else:
-            return self.trades_df[self.trades_df['data_name'] == data_name]
+            rdf = self.trades_df[self.trades_df['data_name'] == data_name].copy()
+        if pct:
+            rdf['return_pct'] = rdf['return_pct'] * 100
+        return rdf
 
     def gen_orders(self, data_name=None) -> 'DataFrame':
         if self.orders_df is None:

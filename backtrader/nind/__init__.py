@@ -5,4 +5,5 @@ from backtrader import Indicator
 
 from .sma import *
 from .ema import *
+from .macd import *
 

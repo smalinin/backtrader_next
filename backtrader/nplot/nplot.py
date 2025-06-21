@@ -36,6 +36,9 @@ from lightweight_charts.widgets import HTMLChart_BN, JupyterChart
 class PInfo(object):
     def __init__(self, sch):
         self.sch = sch
+        self.reset()
+
+    def reset(self):
         self.nrows = 0
         self.row = 0
         self.clock = None
@@ -125,17 +128,16 @@ class Plot(with_metaclass(MetaParams, object)):
         self.pinf.xstart = self.pinf.pstart
         self.pinf.xend = self.pinf.pend
 
-        self.pinf.clock = strategy
+        # self.pinf.clock = strategy
         # xreal - list of datetimes
-        self.pinf.xreal = self.pinf.clock.datetime.plot(
-                self.pinf.pstart, self.pinf.psize)
-        self.pinf.xlen = len(self.pinf.xreal)
-        self.pinf.x = list(range(self.pinf.xlen)) #list of ints [0 ... xlen]
+        # self.pinf.xreal = self.pinf.clock.datetime.plot(
+        #         self.pinf.pstart, self.pinf.psize)
+        # self.pinf.xlen = len(self.pinf.xreal)
+        # self.pinf.x = list(range(self.pinf.xlen)) #list of ints [0 ... xlen]
 
         ###########################################################################
         # Do the plotting
         # Things that go always at the top (observers)
-        self.pinf.xdata = self.pinf.x
 
         c_top = {}
         if self.performance:
@@ -156,31 +158,19 @@ class Plot(with_metaclass(MetaParams, object)):
                     }
             self.performance_metrics = self.performance.compute_stats()
 
-        #     self.plotind(None, ptop, subinds=self.dplots_over[ptop])
+        #??     self.plotind(None, ptop, subinds=self.dplots_over[ptop])
 
         # Create the rest on a per data basis
-        dt0, dt1 = self.pinf.xreal[0], self.pinf.xreal[-1]
         for data in strategy.datas:
             if not data.plotinfo.plot:
                 continue
 
-            self.pinf.xdata = self.pinf.x #??
+            self.pinf.reset()
+
             # xd - list of datetimes
-            xd = data.datetime.plotrange(self.pinf.xstart, self.pinf.xend)
-            if len(xd) < self.pinf.xlen:
-                self.pinf.xdata = xdata = []
-                xreal = self.pinf.xreal
-                dts = data.datetime.plot()
-                xtemp = list()
-                for dt in (x for x in dts if dt0 <= x <= dt1):
-                    dtidx = bisect.bisect_left(xreal, dt)
-                    xdata.append(dtidx)
-                    xtemp.append(dt)
-
-                self.pinf.xstart = bisect.bisect_left(dts, xtemp[0])
-                self.pinf.xend = bisect.bisect_right(dts, xtemp[-1])
-
+            xd = data.datetime.plot()
             xdates = [num2date(value) for value in xd]
+
             # plot ind above data
             c_up = []
             for ind in self.dplots_up[data]:
@@ -216,7 +206,7 @@ class Plot(with_metaclass(MetaParams, object)):
         return None
 
     def prepare_trades_list(self, data_name:str):
-        trades = self.performance.gen_trades(data_name) if self.performance else pd.DataFrame()
+        trades = self.performance.gen_trades(data_name, True) if self.performance else pd.DataFrame()
         orders = self.performance.gen_orders(data_name) if self.performance else pd.DataFrame()
         df_lst = pd.merge(trades, orders, left_on='dateopen', right_on='o_datetime', how='outer')
         lst = df_lst.to_dict(orient='records')
@@ -233,7 +223,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 if (size_prev < 0 and size > 0) or (size_prev > 0 and size < 0):
                     trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
                                     'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':v['return_pct'], 'dateopen': format_datetime(v['dateopen']),
+                                    'return_pct':f"{v['return_pct']:0.4f}    " , 'dateopen': format_datetime(v['dateopen']),
                                     'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
                                     'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
             else:
@@ -241,7 +231,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 if not np.isnan(v['ref']):
                     trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
                                     'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':v['return_pct'], 'dateopen': format_datetime(v['dateopen']),
+                                    'return_pct':f"{v['return_pct']:0.4f}    ", 'dateopen': format_datetime(v['dateopen']),
                                     'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
                                     'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
                 else:
@@ -301,9 +291,9 @@ class Plot(with_metaclass(MetaParams, object)):
                     i_style = 'dashed' if i_ls=='--' else 'solid'
                     i_color = ind.get('color', None)
                     if not ind.get('samecolor', False):
-                        self.pinf.nextcolor(id)
+                        self.pinf.nextcolor(0) #id)
                     if i_color is None:
-                        i_color = self.pinf.color(id)
+                        i_color = self.pinf.color(0) #id)
                     v_label = ind['label']
                     v_data = ind['data']
                     line = chart.create_histogram(v_label, price_line=False, price_label=False)
@@ -323,9 +313,9 @@ class Plot(with_metaclass(MetaParams, object)):
                     i_style = 'dashed' if i_ls=='--' else 'solid'
                     i_color = ind.get('color', None)
                     if not ind.get('samecolor', False):
-                        self.pinf.nextcolor(id)
+                        self.pinf.nextcolor(0) #id)
                     if i_color is None:
-                        i_color = self.pinf.color(id)
+                        i_color = self.pinf.color(0) #id)
                     v_label = ind['label']
                     v_data = ind['data']
                     line = chart.create_line(v_label, color=i_color, style=i_style, price_line=False, price_label=False)
@@ -510,7 +500,7 @@ class Plot(with_metaclass(MetaParams, object)):
 
             pltmethod = lineplotinfo._get('_method', 'plot')
 
-            xdata, lplotarray = self.pinf.xdata, lplot
+            lplotarray = lplot
             if lineplotinfo._get('_skipnan', False): #??
                 # Get the full array and a mask to skipnan
                 lplotarray = np.array(lplot)
@@ -518,7 +508,6 @@ class Plot(with_metaclass(MetaParams, object)):
 
                 # Get both the axis and the data masked
                 lplotarray = lplotarray[lplotmask]
-                xdata = np.array(xdata)[lplotmask]
 
             # Create indicator dictionary
             indicator = {
