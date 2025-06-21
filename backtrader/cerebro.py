@@ -211,15 +211,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         with ``optdatas`` the total gain increases to a total speed-up of
         ``32%`` in an optimization run.
 
-      ??- ``oldsync`` (default: ``False``)
-
-        Starting with release 1.9.0.99 the synchronization of multiple datas
-        (same or different timeframes) has been changed to allow datas of
-        different lengths.
-
-        If the old behavior with data0 as the master of the system is wished,
-        set this parameter to true
-
       - ``tz`` (default: ``None``)
 
         Adds a global timezone for strategies. The argument ``tz`` can be
@@ -282,7 +273,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('live', False),
         ('writer', False),
         ('tradehistory', False),
-#        ('oldsync', False),
         ('tz', None),
         ('cheat_on_open', False),
         ('broker_coo', True),
@@ -1579,21 +1569,17 @@ class Cerebro(with_metaclass(MetaParams, object)):
         check_timers = self._check_timers
         next_writers = self._next_writers
         cheat_on_open = self.p.cheat_on_open
-        
+
+        dts = [d.advance_peek() for d in datas]
         while True:
             # Check next incoming date in the datas
-            dts = [d.advance_peek() for d in datas]
             dt0 = min(dts)
             if dt0 == float('inf'):
                 break  # no data delivers anything
 
-            # Timemaster if needed be
-            # dmaster = datas[dts.index(dt0)]  # and timemaster
             for i, dti in enumerate(dts):
                 if dti <= dt0:
                     datas[i].advance()
-                else:
-                    pass
 
             # Timers before broker (cheat)
             check_timers(runstrats, dt0, cheat=True)
@@ -1613,11 +1599,15 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
             # Strategy once-post and writer updates
             for strat in runstrats:
-                strat._oncepost(dt0)
+                strat._oncepost(dt0, dts)
                 if self._event_stop:  # stop if requested
                     return
 
                 next_writers(runstrats)
+
+            for i, d in enumerate(datas):
+                if dts[i] <= dt0:
+                    dts[i] = d.advance_peek()
 
     def _check_timers(self, runstrats, dt0, cheat=False):
         timers = self._timers if not cheat else self._timerscheat

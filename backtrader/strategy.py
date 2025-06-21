@@ -111,7 +111,6 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
     _ltype = LineIterator.StratType
 
     csv = True
-    _oldsync = False  # update clock using old methodology : data 0
 
     # keep the latest delivered data date in the line
     lines = ('datetime',)
@@ -272,6 +271,19 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self._minperstatus = minperstatus = max(dlens)
         return minperstatus, dlens
 
+    def _getminperstatus_once(self, dt, dts=None):
+        # check the min period status connected to datas
+        _datas = self.datas
+        if dts is None:
+            dlens = list(map(operator.sub, self._minperiods, map(len, self.datas)))
+        else:
+            dlens = [
+                    self._minperiods[i] - len(self.datas[i]) if dt >= dts[i] else self._minperiods[i]
+                        for i in range(len(self.datas))
+                    ]
+        self._minperstatus = minperstatus = max(dlens)
+        return minperstatus, dlens
+
     def prenext_open(self):
         pass
 
@@ -290,7 +302,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         else:
             self.prenext_open()
 
-    def _oncepost(self, dt):
+    def _oncepost(self, dt, dts=None):
         for indicator in self._ind_iterator:
             # if len(indicator._clock) > len(indicator):  ##?? duplicated it is checked already in indicator.advance()
             indicator.advance()
@@ -301,7 +313,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self.lines.datetime[0] = dt
         self._notify()
 
-        minperstatus, dlens = self._getminperstatus() ## Get the minimum period status and data lengths
+        minperstatus, dlens = self._getminperstatus_once(dt, dts) ## Get the minimum period status and data lengths
         ##---fixed---##
         any_status = any(x < 0 for x in dlens)
         if minperstatus < 0 or any_status:
@@ -318,12 +330,6 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self.clear()
 
     def _clk_update(self):
-        if self._oldsync:
-            clk_len = super(Strategy, self)._clk_update()
-            self.lines.datetime[0] = max(d.datetime[0]
-                                         for d in self.datas if len(d))
-            return clk_len
-
         newdlens = [len(d) for d in self.datas]
         if any(nl > l for l, nl in zip(self._dlens, newdlens)):
             self.forward()
@@ -364,10 +370,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
             if once:
                 if len(self) > len(observer):
-                    if self._oldsync:
-                        observer.advance()
-                    else:
-                        observer.forward()
+                    observer.forward()
 
                 if minperstatus < 0:
                     observer.next()
