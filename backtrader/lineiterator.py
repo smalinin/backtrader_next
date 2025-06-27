@@ -353,7 +353,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
         '''
 
         # Called once for 1st full calculation - defaults to regular next
-        self.next()
+        self.next(None)
 
     def next(self, status=None):
         '''

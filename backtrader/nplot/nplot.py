@@ -1,20 +1,12 @@
 import bisect
 import collections
-# from curses.ascii import HT
 import datetime
-# import html
-# import itertools
-# import math
-# import operator
 import sys
-# from turtle import ht
-# from turtle import strat_name
 import time
 import webbrowser
 import os
 from pathlib import Path
 
-# from matplotlib.pylab import f
 import pandas as pd
 import numpy as np
 
@@ -127,13 +119,6 @@ class Plot(with_metaclass(MetaParams, object)):
 
         self.pinf.xstart = self.pinf.pstart
         self.pinf.xend = self.pinf.pend
-
-        # self.pinf.clock = strategy
-        # xreal - list of datetimes
-        # self.pinf.xreal = self.pinf.clock.datetime.plot(
-        #         self.pinf.pstart, self.pinf.psize)
-        # self.pinf.xlen = len(self.pinf.xreal)
-        # self.pinf.x = list(range(self.pinf.xlen)) #list of ints [0 ... xlen]
 
         ###########################################################################
         # Do the plotting
