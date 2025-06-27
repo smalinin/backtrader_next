@@ -178,44 +178,11 @@ class Eq(bt.Analyzer):
         annual_trading_days = float(365 if index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
         num_years = (eq_df.index[-1] - eq_df.index[0]).days / annual_trading_days
-        # returns = day_returns.to_numpy()
 
-        # index = ohlc_data.index
-        # dd = 1 - equity / np.maximum.accumulate(equity)
-        dd = (1- equity / np.maximum.accumulate(equity)) * 100
-        dd_dur, dd_peaks = compute_drawdown_duration_peaks(pd.Series(dd, index=index))
-        dd_df = 1 - eq_df['value'] / eq_df['value'].cummax()
+        dd_df = (1 - eq_df['value'] / eq_df['value'].cummax()) * 100
+        dd_dur, dd_peaks = compute_drawdown_duration_peaks(dd_df)
 
-        equity_df = pd.DataFrame({
-            'Equity': equity,
-            'DrawdownPct': dd,
-            'DrawdownDuration': dd_dur},
-            index=index)
-
-        # if isinstance(trades, pd.DataFrame):
-        #     trades_df: pd.DataFrame = trades
-        #     commissions = None  # Not shown
-        # else:
-        #     # Came straight from Backtest.run()
-        #     trades_df = pd.DataFrame({
-        #         'Size': [t.size for t in trades],
-        #         'EntryBar': [t.entry_bar for t in trades],
-        #         'ExitBar': [t.exit_bar for t in trades],
-        #         'EntryPrice': [t.entry_price for t in trades],
-        #         'ExitPrice': [t.exit_price for t in trades],
-        #         'PnL': [t.pl for t in trades],
-        #         'ReturnPct': [t.pl_pct for t in trades],
-        #         'EntryTime': [t.entry_time for t in trades],
-        #         'ExitTime': [t.exit_time for t in trades],
-        #         'SL': [t.sl for t in trades],
-        #         'TP': [t.tp for t in trades],
-        #         'Tag': [t.tag for t in trades],
-        #     })
-        #     trades_df['Duration'] = trades_df['ExitTime'] - trades_df['EntryTime']
-        #     commissions = sum(t._commissions for t in trades)
-        # del trades
         trades_df['Duration'] = trades_df['dateclose'] - trades_df['dateopen']
-        # commissions = sum(t._commissions for t in trades)
         commissions = sum(trades_df['commission'].to_numpy())
 
         pl = trades_df['pnlcomm']
@@ -234,18 +201,11 @@ class Eq(bt.Analyzer):
         s.loc['End'] = index[-1]
         s.loc['Duration'] = s.End - s.Start
 
-        """
-        have_position = np.repeat(0, len(index))
-        for t in trades_df.itertuples(index=False):
-            have_position[t.EntryBar:t.ExitBar + 1] = 1
-
-        s.loc['Exposure Time [%]'] = have_position.mean() * 100  # In "n bars" time, not index time
-        """
         s.loc['Equity Start [$]'] = equity[0]
         s.loc['Equity Final [$]'] = equity[-1]
         s.loc['Equity Peak [$]'] = equity.max()
         s.loc['Commissions [$]'] = commissions
-        s.loc['Return [%]'] = (equity[-1] - equity[0]) / equity[0] * 100
+        s.loc['Cum Return [%]'] = ((equity[-1] - equity[0]) / equity[0] * 100).round(4)
         # c = ohlc_data.Close.values
         # s.loc['Buy & Hold Return [%]'] = (c[-1] - c[0]) / c[0] * 100  # long-only return
 
@@ -255,57 +215,70 @@ class Eq(bt.Analyzer):
         # Our annualized return matches `empyrical.annual_return(day_returns)` whereas
         # our risk doesn't; they use the simpler approach below.
         annualized_return = (1 + gmean_day_return) ** annual_trading_days - 1
-        s.loc['Return (Ann.) [%]'] = annualized_return * 100
-        # s.loc['Volatility (Ann.) [%]'] = np.sqrt(
-        #     (day_returns.var(ddof=int(bool(day_returns.shape))) + (1 + gmean_day_return) ** 2) ** annual_trading_days - (
-        #             1 + gmean_day_return) ** (2 * annual_trading_days)) * 100  # noqa: E501
+        s.loc['Return (Ann.) [%]'] = (annualized_return * 100).round(4)
         # s.loc['Risk (Ann.) [%]'] = day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100
-        s.loc['Volatility (Ann.) [%]'] = volatility = day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100
+        s.loc['Volatility (Ann.) [%]'] = volatility = (day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100).round(4)
 
-        s.loc['CAGR [%]'] = ((equity[-1]/equity[0]) ** (1/num_years) - 1) * 100
+        # CAGR from quantstats
+        # _total = day_returns.add(1).prod() - 1
+        # _years = (day_returns.index[-1] - day_returns.index[0]).days / annual_trading_days
+        # _res = abs(_total + 1.0) ** (1.0 / _years) - 1
+        s.loc['CAGR [%]'] = (((equity[-1]/equity[0]) ** (1/num_years) - 1) * 100).round(4)
 
-        # Our Sharpe mismatches `empyrical.sharpe_ratio()` because they use arithmetic mean return
-        # and simple standard deviation
-        s.loc['Sharpe Ratio'] = (s.loc['Return (Ann.) [%]'] - risk_free_rate * 100) / (
-                volatility if volatility!=0 else np.nan)  # noqa: E501
+        # Sharpe Ratio using arithmetic mean of returns to align with standard definition.
+        # See: https://en.wikipedia.org/wiki/Sharpe_ratio
+        mean_daily_return = day_returns.mean()
+        annualized_mean_return = mean_daily_return * annual_trading_days
+        s.loc['Sharpe Ratio'] = sharpe = ((annualized_mean_return * 100 - risk_free_rate * 100) / (
+                volatility if volatility != 0 else np.nan)).round(4)
+
+        # Smart Sharpe Ratio
+        skew = day_returns.skew()
+        kurt = day_returns.kurt()  # Excess kurtosis
+        s.loc['Smart Sharpe Ratio'] = (sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2))).round(4)
+
         # Our Sortino mismatches `empyrical.sortino_ratio()` because they use arithmetic mean return
-        _downside_std = np.sqrt(np.mean(day_returns.clip(-np.inf, 0) ** 2))
-        s.loc['Sortino Ratio'] = (annualized_return - risk_free_rate) / (
-                _downside_std * np.sqrt(annual_trading_days)) if _downside_std!=0 else np.nan  # noqa: E501
+        _downside_returns = day_returns.clip(-np.inf, 0)
+        _downside_std = np.sqrt(np.mean(_downside_returns ** 2))
+        sortino_ratio = (annualized_mean_return - risk_free_rate) / (
+                _downside_std * np.sqrt(annual_trading_days)) if _downside_std != 0 else np.nan
+        s.loc['Sortino Ratio'] = (sortino_ratio).round(4)
 
-        s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
-        max_dd = -np.nan_to_num(dd.max())
-        s.loc['Calmar Ratio'] = (annualized_return * 100) / abs(max_dd) if max_dd != 0 else np.nan
+        # s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
+        s.loc['VWR Ratio'] = (calc_vwr(eq_days=day_eq.to_numpy())).round(4)
+        max_dd = -np.nan_to_num(dd_df.max())
+        s.loc['Calmar Ratio'] = ((annualized_return * 100) / abs(max_dd) if max_dd != 0 else np.nan).round(4)
 
-        total_return = (day_returns.add(1)).prod() - 1
-        s.loc['Recovery factor [%]'] = abs(total_return) / abs(max_dd) * 100 if abs(max_dd) != 0 else np.nan
+        # total_return = (day_returns.add(1)).prod() - 1 # Wrong calc
+        total_return = day_returns.sum()
+        s.loc['Recovery factor [%]'] = (abs(total_return) / abs(max_dd) * 100 if abs(max_dd) != 0 else np.nan).round(4)
 
-        s.loc['Max. Drawdown [%]'] = max_dd
-        s.loc['Avg. Drawdown [%]'] = -dd_peaks.mean()
+        s.loc['Max. Drawdown [%]'] = (max_dd).round(4)
+        s.loc['Avg. Drawdown [%]'] = (-dd_peaks.mean()).round(4)
         s.loc['Max. Drawdown Duration'] = _round_timedelta(dd_dur.max())
         s.loc['Avg. Drawdown Duration'] = _round_timedelta(dd_dur.mean())
         s.loc['Drawdown Peak'] = dd_df.idxmax()
         s.loc['# Trades'] = n_trades = len(trades_df)
         win_rate = np.nan if not n_trades else (pl > 0).mean()
-        s.loc['Win Rate [%]'] = win_rate * 100
-        s.loc['Best Trade [%]'] = returns_pct.max() * 100
-        s.loc['Worst Trade [%]'] = returns_pct.min() * 100
+        s.loc['Win Rate [%]'] = (win_rate * 100).round(4)
+        s.loc['Best Trade [%]'] = (returns_pct.max() * 100).round(4)
+        s.loc['Worst Trade [%]'] = (returns_pct.min() * 100).round(4)
         mean_return = geometric_mean(returns_pct)
-        s.loc['Avg. Trade [%]'] = mean_return * 100
+        s.loc['Avg. Trade [%]'] = (mean_return * 100).round(4)
         s.loc['Max. Trade Duration'] = _round_timedelta(durations.max())
         s.loc['Avg. Trade Duration'] = _round_timedelta(durations.mean())
 
         gross_profit = day_returns[day_returns > 0].sum()
         gross_loss = abs(day_returns[day_returns < 0].sum())
-        s.loc['Profit Factor'] = gross_profit / gross_loss if gross_loss != 0 else np.nan
-        s.loc['Expectancy [%]'] = day_returns.mean() * 100
-        s.loc['SQN'] = np.sqrt(n_trades) * pl.mean() / pl.std() if pl.std() != 0 else np.nan
+        s.loc['Profit Factor'] = (gross_profit / gross_loss if gross_loss != 0 else np.nan).round(4)
+        s.loc['Expectancy [%]'] = (day_returns.mean() * 100).round(4)
+        s.loc['SQN'] = (np.sqrt(n_trades) * pl.mean() / pl.std() if pl.std() != 0 else np.nan).round(4)
 
         avg_win = pl[pl > 0].mean()
         avg_loss = -pl[pl < 0].mean()
         if avg_win is not np.nan and avg_loss > 0:
             b = avg_win / abs(avg_loss)
-            s.loc['Kelly Criterion [%]'] = (win_rate - (1 - win_rate) / b) * 100
+            s.loc['Kelly Criterion [%]'] = ((win_rate - (1 - win_rate) / b) * 100).round(4)
         else:
             s.loc['Kelly Criterion [%]'] = np.nan
 
@@ -382,26 +355,26 @@ def calc_vwr0(eq_days: np.array, sdev_max=2.0, tau=0.20) -> float:
 #      - https://www.crystalbull.com/sharpe-ratio-better-with-log-returns/
 def calc_vwr(eq_days: np.array, sdev_max=2.0, tau=0.20) -> float:
     eq = eq_days #.to_numpy()
-    eq_0 = np.roll(eq, 1)  # ����� ������ shift()
+    eq_0 = np.roll(eq, 1)  # shift()
 
-    # ������������ nlrtot � rtot
+    # Calculate nlrtot and rtot
     nlrtot = eq[-1] / eq[0] if eq[0] != 0 else float('-inf')
     if nlrtot <= 0.0:
         return float('-inf')
     rtot = math.log(nlrtot)
 
-    # ������� �������� ���������� � ��� ������������
+    # Calculate ravg
     ravg = rtot / len(eq)
     rnorm = math.expm1(ravg * 252)
     rnorm100 = rnorm * 100.0
 
-    # ����������������� ������ ����������
+    # Calculate expected returns
     n_vals = np.arange(len(eq))
     expected = eq_0 * np.exp(ravg * n_vals)
     dts = np.where(expected != 0, eq / expected - 1.0, 0.0)
 
-    # ����������� ���������� � ������������� �������� VWR
-    sdev_p = np.std(dts[1:], ddof=1)  # ���������� ������ �������, �.�. ��� ����� NaN
+    # Calculate standard deviation of the returns
+    sdev_p = np.std(dts[1:], ddof=1)  # Use ddof=1 to get sample standard deviation
     vwr = rnorm100 * (1.0 - (sdev_p / sdev_max) ** tau)
     return vwr
 
