@@ -100,7 +100,7 @@ class LaguerreFilter(PeriodN):
 
     l0, l1, l2, l3 = 0.0, 0.0, 0.0, 0.0
 
-    def next(self):
+    def next(self, status):
         l0_1 = self.l0  # cache previous intermediate values
         l1_1 = self.l1
         l2_1 = self.l2

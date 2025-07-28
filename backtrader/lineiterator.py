@@ -286,7 +286,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
             # assume indicators and others operate on same length datas
             # although the above operation can be generalized
             if clock_len > self._minperiod:
-                self.next()
+                self.next(None)
             elif clock_len == self._minperiod:
                 self.nextstart()  # only called for the 1st value
             elif clock_len:

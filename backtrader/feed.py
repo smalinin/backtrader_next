@@ -457,7 +457,7 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase, dataseries.OHLCDateT
     ##?? TODO FIXME
     def preload(self):
         if len(self._ffilters)==0 and len(self._filters)==0:
-            if self._preload():  #?? Fixme Use TZ Input from load()  fromdate and todata
+            if self._preload():
                 self.home()
                 return
 

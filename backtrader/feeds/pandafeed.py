@@ -20,6 +20,7 @@
 ###############################################################################
 # from __future__ import (absolute_import, division, print_function, unicode_literals)
 
+from array import array
 from backtrader.utils.py3 import string_types, integer_types
 
 from backtrader import date2num
@@ -164,9 +165,11 @@ class PandasData(feed.DataBase):
 
     def __init__(self):
         super(PandasData, self).__init__()
+        self._preloaded = False
 
         if self.p.dataframe is None:
             raise ValueError("Missing required parameter 'dataframe'.")
+
         # these "colnames" can be strings or numeric types
         colnames = list(self.p.dataframe.columns.values)
         if self.p.datetime is None:
@@ -174,8 +177,8 @@ class PandasData(feed.DataBase):
             pass
 
         # try to autodetect if all columns are numeric
-        cstrings = filter(lambda x: isinstance(x, string_types), colnames)
-        colsnumeric = not len(list(cstrings))
+        # cstrings = filter(lambda x: isinstance(x, string_types), colnames)
+        # colsnumeric = not len(list(cstrings))
 
         # Where each datafield find its value
         self._colmapping = dict()
@@ -204,6 +207,23 @@ class PandasData(feed.DataBase):
             else:
                 # all other cases -- used given index
                 self._colmapping[datafield] = defmapping
+
+        coldtime = self._colmapping['datetime']
+
+        if coldtime is None:
+            # standard index in the datetime
+            if self.p.fromdate is not None:
+                self.p.dataframe = self.p.dataframe[ self.p.dataframe.index.date >= self.p.fromdate ].copy()
+            if self.p.todate is not None:
+                self.p.dataframe = self.p.dataframe[ self.p.dataframe.index.date <= self.p.todate ].copy()
+        else:
+            # it's in a different column ... use standard column index
+            if self.p.fromdate is not None:
+                self.p.dataframe = self.p.dataframe[ self.p.dataframe[coldtime].dt.date >= self.p.fromdate ].copy()
+            if self.p.todate is not None:
+                self.p.dataframe = self.p.dataframe[ self.p.dataframe[coldtime].dt.date <= self.p.todate ].copy()
+
+
 
     def start(self):
         super(PandasData, self).start()
@@ -236,12 +256,21 @@ class PandasData(feed.DataBase):
             self._colmapping[k] = v
 
     def _load(self):
+        if self._preloaded:
+            return False
+        
         self._idx += 1
 
         if self._idx >= len(self.p.dataframe):
             # exhausted all rows
             return False
 
+        if self._preloaded:
+            # if preloaded, just return True
+            # this is used to avoid reloading the data in the next iteration
+            return True
+
+        # if not preloaded, we need to set the lines
         # Set the standard datafields
         for datafield in self.getlinealiases():
             if datafield == 'datetime':
@@ -294,7 +323,7 @@ class PandasData(feed.DataBase):
             else:
                 # indexing for pandas: 1st is colum, then row
                 ds = self.p.dataframe.iloc[:, colindex]
-                line.ndbuffer(np.asarray(ds))
+                line.ndbuffer(array('d', ds.to_numpy()))
 
         # datetime conversion
         coldtime = self._colmapping['datetime']
@@ -308,7 +337,9 @@ class PandasData(feed.DataBase):
 
         # convert to float via datetime and store it
         dt = tstamp.to_pydatetime()
-        self.lines.datetime.ndbuffer(np.array([date2num(v) for v in dt]))
+        #self.lines.datetime.ndbuffer(np.array([date2num(v) for v in dt]))
+        self.lines.datetime.ndbuffer(array('d', (date2num(v) for v in dt)))
 
         # Done ... return
+        self._preloaded = True
         return True

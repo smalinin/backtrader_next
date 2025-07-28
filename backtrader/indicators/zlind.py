@@ -73,7 +73,7 @@ class ZeroLagIndicator(MovingAverageBase):
         # To make mixins work - super at the end for cooperative inheritance
         super(ZeroLagIndicator, self).__init__()
 
-    def next(self):
+    def next(self, status):
         leasterror = MAXINT  # 1000000 in original code
         bestec = ema = self.ema[0]  # seed value 1st time for ec
         price = self.data[0]

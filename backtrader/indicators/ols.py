@@ -47,7 +47,7 @@ class OLS_Slope_InterceptN(PeriodN):
         ('period', 10),
     )
 
-    def next(self):
+    def next(self, status):
         p0 = pd.Series(self.data0.get(size=self.p.period))
         p1 = pd.Series(self.data1.get(size=self.p.period))
         p1 = sm.add_constant(p1)
@@ -93,7 +93,7 @@ class OLS_BetaN(PeriodN):
     lines = ('beta',)
     params = (('period', 10),)
 
-    def next(self):
+    def next(self, status):
         y, x = (pd.Series(d.get(size=self.p.period)) for d in self.datas)
         r_beta = pd.ols(y=y, x=x, window_type='full_sample')
         self.lines.beta[0] = r_beta.beta['x']

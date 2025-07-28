@@ -454,6 +454,12 @@ class LineSeries(with_metaclass(MetaLineSeries, LineMultiple)):
     def array(self):
         return self.lines[0].array
 
+    def get_array(self, nlast=0):
+        return self.lines[0].get_array(nlast=nlast)
+
+    def get_array_preloaded(self):
+        return self.lines[0].get_array_preloaded()
+
     def __getattr__(self, name):
         # to refer to line by name directly if the attribute was not found
         # in this object if we set an attribute in this object it will be

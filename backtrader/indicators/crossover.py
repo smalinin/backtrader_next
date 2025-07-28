@@ -40,7 +40,7 @@ class NonZeroDifference(Indicator):
     def nextstart(self):
         self.l.nzd[0] = self.data0[0] - self.data1[0]  # seed value
 
-    def next(self):
+    def next(self, status):
         d = self.data0[0] - self.data1[0]
         self.l.nzd[0] = d if d else self.l.nzd[-1]
 

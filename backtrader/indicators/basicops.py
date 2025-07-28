@@ -55,7 +55,7 @@ class OperationN(PeriodN):
     Formula:
       - line = func(data, period)
     '''
-    def next(self):
+    def next(self, status):
         self.line[0] = self.func(self.data.get(size=self.p.period))
 
     def once(self, start, end):
@@ -316,7 +316,7 @@ class Accum(Indicator):
     def nextstart(self):
         self.line[0] = self.p.seed + self.data[0]
 
-    def next(self):
+    def next(self, status):
         self.line[0] = self.line[-1] + self.data[0]
 
     def oncestart(self, start, end):
@@ -349,7 +349,7 @@ class Average(PeriodN):
     alias = ('ArithmeticMean', 'Mean',)
     lines = ('av',)
 
-    def next(self):
+    def next(self, status):
         self.line[0] = \
             math.fsum(self.data.get(size=self.p.period)) / self.p.period
 
@@ -389,9 +389,9 @@ class ExponentialSmoothing(Average):
 
     def nextstart(self):
         # Fetch the seed value from the base class calculation
-        super(ExponentialSmoothing, self).next()
+        super(ExponentialSmoothing, self).next(None)
 
-    def next(self):
+    def next(self, status):
         self.line[0] = self.line[-1] * self.alpha1 + self.data[0] * self.alpha
 
     def oncestart(self, start, end):
@@ -437,7 +437,7 @@ class ExponentialSmoothingDynamic(ExponentialSmoothing):
         minperioddiff = max(0, self.alpha._minperiod - self.p.period)
         self.lines[0].incminperiod(minperioddiff)
 
-    def next(self):
+    def next(self, status):
         self.line[0] = \
             self.line[-1] * self.alpha1[0] + self.data[0] * self.alpha[0]
 
@@ -475,7 +475,7 @@ class WeightedAverage(PeriodN):
     def __init__(self):
         super(WeightedAverage, self).__init__()
 
-    def next(self):
+    def next(self, status):
         data = self.data.get(size=self.p.period)
         dataweighted = map(operator.mul, data, self.p.weights)
         self.line[0] = self.p.coef * math.fsum(dataweighted)

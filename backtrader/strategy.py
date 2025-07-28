@@ -27,6 +27,9 @@ import inspect
 import itertools
 import operator
 
+from numpy import dtype
+import pandas as pd
+
 from .utils.py3 import (keys, integer_types, iteritems, itervalues,
                         MAXINT, string_types, with_metaclass)
 
@@ -152,6 +155,18 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                 it.qbuffer(savemem=1)
             for it in self._strat_iterator:
                 it.qbuffer(savemem=1)
+
+    def get_description(self) -> pd.Series:
+        '''
+        Returns a pandas Series with the strategy description.
+        The description is built from the strategy parameters and the
+        indicators and observers used in the strategy.
+        '''
+        desc = pd.Series(dtype=object)
+        desc.loc["Strategy"] = self.__class__.__name__
+        for key, val in self.params._getitems():
+            desc.loc[key]=val
+        return desc
 
     def _periodset(self):
         dataids = [id(data) for data in self.datas]

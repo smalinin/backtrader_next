@@ -24,6 +24,7 @@ import datetime
 import collections
 import itertools
 import multiprocessing
+import pandas as pd
 
 try:  # For new Python versions
     collectionsAbc = collections.abc  # collections.Iterable -> collections.abc.Iterable
@@ -38,11 +39,14 @@ from . import indicator
 from .brokers import BackBroker
 from .metabase import MetaParams
 from . import observers
+from . import analyzers
 from .writer import WriterFile
 from .utils import OrderedDict, tzparse, num2date, date2num
 from .strategy import Strategy, SignalStrategy
 from .tradingcal import (TradingCalendarBase, TradingCalendar, PandasMarketCalendar)
 from .timer import Timer
+from . import nplot
+from .nplot.utils import tmpfilename
 
 # Defined here to make it pickable. Ideally it could be defined inside Cerebro
 
@@ -83,37 +87,15 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
          How many cores to use simultaneously for optimization
 
-      - ``stdstats`` (default: ``True``)
+      - ``stdstats`` (default: ``False``)
 
         If True default Observers will be added: Broker (Cash and Value),
         Trades and BuySell
 
-      ??- ``oldbuysell`` (default: ``False``)
+      - ``stats`` (default: ``True``)
 
-        If ``stdstats`` is ``True`` and observers are getting automatically
-        added, this switch controls the main behavior of the ``BuySell``
-        observer
-
-        - ``False``: use the modern behavior in which the buy / sell signals
-          are plotted below / above the low / high prices respectively to avoid
-          cluttering the plot
-
-        - ``True``: use the deprecated behavior in which the buy / sell signals
-          are plotted where the average price of the order executions for the
-          given moment in time is. This will of course be on top of an OHLC bar
-          or on a Line on Cloe bar, difficulting the recognition of the plot.
-
-      ??- ``oldtrades`` (default: ``False``)
-
-        If ``stdstats`` is ``True`` and observers are getting automatically
-        added, this switch controls the main behavior of the ``Trades``
-        observer
-
-        - ``False``: use the modern behavior in which trades for all datas are
-          plotted with different markers
-
-        - ``True``: use the old Trades observer which plots the trades with the
-          same markers, differentiating only if they are positive or negative
+        If True default Observers will be added: Broker (Cash and Value),
+        Trades and BuySell
 
       - ``exactbars`` (default: ``False``)
 
@@ -262,9 +244,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('preload', True),
         ('runonce', True),
         ('maxcpus', None),
-        ('stdstats', True),
-#        ('oldbuysell', False),
-#        ('oldtrades', False),
+        ('stdstats', False),
+        ('stats', True),
         ('lookahead', 0),
         ('exactbars', False),
         ('optdatas', True),
@@ -634,6 +615,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         self.analyzers.append((ancls, args, kwargs))
 
+    def get_stats(self):
+        return self.analyzers.getbyname('eq')
+
     def addobserver(self, obscls, *args, **kwargs):
         '''
         Adds an ``Observer`` class to the mix. Instantiation will be done at
@@ -925,7 +909,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
     broker = property(getbroker, setbroker)
 
-    def plot(self, plotter=None, numfigs=1, iplot=True, start=None, end=None,
+    def old_plot(self, plotter=None, numfigs=1, iplot=True, start=None, end=None,
              width=16, height=9, dpi=300, tight=True, use=None,
              **kwargs):
         '''
@@ -980,8 +964,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         return figs
 
-    def nplot(self, iplot=False, start=None, end=None,
-             width=1000, height=900, **kwargs):
+    def plot(self, iplot=False, start=None, end=None,
+             width=1000, height=900, show=True, filename=None, **kwargs):
         '''
         Plots the strategies inside cerebro
 
@@ -1010,12 +994,44 @@ class Cerebro(with_metaclass(MetaParams, object)):
         plotter = nplot.Plot(**kwargs)
 
         flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
-        plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                    width=width, height=height)
-        # for stratlist in self.runstrats:
-        #     for si, strat in enumerate(stratlist):
-        #         plotter.plot(strat, iplot=iplot, start=start, end=end)
-        return
+        if filename is None:
+            with tmpfilename() as fname:
+                plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
+                            width=width, height=height, show=show, filename=fname)
+        else:
+                plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
+                            width=width, height=height, show=show, filename=filename)
+
+    def statistics(self) -> pd.Series:
+        flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
+        if len(flat_runstrats) == 0:
+            return pd.DataFrame.empty()
+        eq = flat_runstrats[0].analyzers.getbyname('eq')
+        stats = eq.compute_stats()
+        if len(flat_runstrats) > 1:
+            desc = pd.Series(dtype=object)
+            desc.loc["Strategy"] = "Multiple Strategies"
+            return pd.concat([desc, stats])
+        else:
+            desc = flat_runstrats[0].get_description()
+            return pd.concat([desc, stats])
+
+
+    def show_report(self, name=None, filename=None, show=True):
+        flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
+        if len(flat_runstrats) == 0:
+            return None
+        eq = flat_runstrats[0].analyzers.getbyname('eq')
+        if eq is None:
+            return None
+        if name is None:
+            name = "Statistics "
+            sname = []
+            for s in flat_runstrats:
+                sname.append(s.__class__.__name__)
+            name = f"Statistics {' '.join(sname)} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        report_gen = nplot.Statistics()
+        report_gen.report(name=name, performance=eq, show=show, filename=filename)
 
     def __call__(self, iterstrat):
         '''
@@ -1109,6 +1125,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self.writers_csv = any(map(lambda x: x.p.csv, self.runwriters))
 
         self.runstrats = list()
+        if self.p.stats:
+            self.addanalyzer(analyzers.Eq, _name='eq')
 
         if self.signals:  # allow processing of signals
             signalst, sargs, skwargs = self._signal_strat

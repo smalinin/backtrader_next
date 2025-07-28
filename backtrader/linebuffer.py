@@ -84,6 +84,30 @@ class LineBuffer(LineSingle):
     def get_idx(self):
         return self._idx
 
+    def get_array(self, nlast=0):
+        arr = self.array
+        nlast = abs(nlast)
+        cur_len = self._idx + 1
+        if cur_len == 0:
+            return []
+        else:
+            if nlast == 0:
+                if self.useislice:
+                    return list(islice(arr, 0, cur_len))
+                else:
+                    return arr[0:cur_len]
+            else:
+                if self.useislice:
+                    return list(islice(arr, cur_len - nlast, cur_len))
+                else:
+                    start = max(0, cur_len - nlast)
+                    return arr[start:cur_len]
+
+    def get_array_preloaded(self):
+        arr = self.array
+        return array.array('d', arr) if self.useislice else arr
+
+
     def set_idx(self, idx, force=False):
         # if QBuffer and the last position of the buffer was reached, keep
         # it (unless force) as index 0. This allows resampling
