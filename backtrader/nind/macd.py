@@ -1,19 +1,9 @@
 import numpy as np
 import numba
 import backtrader as bt
+from .utils import compute_ema_numba
 
 __all__ = ['MACD']
-
-# JIT-compiled EMA computation
-@numba.njit
-def compute_ema_numba(closes, alpha, period):
-    n = len(closes)
-    result = np.empty(n, dtype=np.float64)
-    result[:period - 1] = np.nan
-    result[period - 1] = np.mean(closes[:period])
-    for i in range(period, n):
-        result[i] = alpha * closes[i] + (1 - alpha) * result[i - 1]
-    return result
 
 @numba.njit
 def compute_macd_numba(closes, fast_alpha, fast_period, slow_alpha, slow_period, signal_alpha, signal_period):
@@ -39,7 +29,6 @@ class MACD(bt.Indicator):
         ('slow_period', 26),
         ('signal_period', 9),
     )
-
     plotinfo = dict(plothlines=[0.0])
     plotlines = dict(signal=dict(ls='--'), 
                      hist=dict(_method='bar', alpha=0.5, width=1.0)
@@ -56,7 +45,7 @@ class MACD(bt.Indicator):
         self._signal_ema = None
 
 
-    def next(self):
+    def next(self, status):
         price = self.data[0]
 
         if len(self.data) == self.p.slow_period:
@@ -81,7 +70,7 @@ class MACD(bt.Indicator):
         if end - start == 1:
             return
 
-        closes = np.asarray(self.data.array, dtype=np.float64)
+        closes = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
         if len(closes) < self.p.slow_period + self.p.signal_period:
             return
 

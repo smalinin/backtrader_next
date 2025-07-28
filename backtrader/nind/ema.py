@@ -1,23 +1,9 @@
 import numpy as np
 import numba
 import backtrader as bt
+from .utils import compute_ema_numba
 
 __all__ = ['EMA']
-
-# JIT-compiled EMA computation
-@numba.njit
-def compute_ema_numba(closes, alpha, period):
-    n = len(closes)
-    result = np.empty(n, dtype=np.float64)
-    # Seed with simple average
-    seed = np.mean(closes[:period])
-    for i in range(period):
-        result[i] = np.nan
-    result[period - 1] = seed
-    # Recursive EMA
-    for i in range(period, n):
-        result[i] = alpha * closes[i] + (1 - alpha) * result[i - 1]
-    return result
 
 class EMA(bt.Indicator):
     '''
@@ -35,10 +21,14 @@ class EMA(bt.Indicator):
     plotinfo = dict(subplot=False)
 
     def __init__(self):
-        self.addminperiod(self.p.period)
+        self.addminperiod(self.p.period * 3)
         self.alpha = 2.0 / (self.p.period + 1)
+        self.min_size = self.p.period * 5
 
-    def next(self):
+    def next(self, status):
+        #series = np.asarray(self.data.array, dtype=np.float64)
+        #series = series[-self.min_size:]
+
         price = self.data[0]
         if len(self.data) == self.p.period:
             closes = self.data.get(size=self.p.period)
@@ -53,9 +43,9 @@ class EMA(bt.Indicator):
             return
 
         '''Compute EMA over full range via Numba JIT function.'''
-        closes = np.asarray(self.data.array, dtype=np.float64)
+        series = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
         period = self.p.period
         if len(closes) < period:
             return
-        vals = compute_ema_numba(closes, self.alpha, period)
+        vals = compute_ema_numba(series, self.alpha, period)
         self.lines.ema.ndbuffer(vals)
