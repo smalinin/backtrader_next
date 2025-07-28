@@ -4,14 +4,16 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 import webbrowser
+import os
 from pathlib import Path
+from .utils import tmpfilename
 
 
 class Statistics(object):
     graphs = []
     tables = []
 
-    def report(self, name="Statistics", performance=None):
+    def report(self, name="Statistics", performance=None, show=True, filename=None):
         """Prepare statistics for the report"""
         if performance is None:
             exception = "No performance data provided"
@@ -22,8 +24,8 @@ class Statistics(object):
 
         annual_trading_days = float(365 if df_eq.index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
-        win_year = annual_trading_days
-        win_half_year = annual_trading_days // 2
+        win_year = int(annual_trading_days)
+        win_half_year = int(annual_trading_days // 2)
         daily = df_eq['value'].resample('D').last().dropna()
         d_returns = daily.pct_change().dropna()
         d_cum_returns = (1 + d_returns).cumprod() - 1
@@ -90,18 +92,17 @@ class Statistics(object):
 
 
         ### Metrics ####
-
         fig_metrics = go.Figure(data=[go.Table(
             header=dict(values=["Metric", "Value"], fill_color='lightgray'),
-            cells=dict(values=[df_stats.index.tolist(), df_stats.values.tolist()]
-            align=["left", "right"],
-            font=dict(size=13),
-            height=26,
-            line_color='darkgray',
-            fill_color=[["#f0f0f0" if i % 2 == 0 else "rgb(244,255,255)" for i in range(len(df_stats))]],
+            cells=dict(values=[df_stats.index.tolist(), [str(val) for val in df_stats.values]],
+            	align=["left", "right"],
+            	font=dict(size=13),
+            	height=26,
+            	line_color='darkgray',
+            	fill_color=[["#f0f0f0" if i % 2 == 0 else "rgb(244,255,255)" for i in range(len(df_stats))]],
             ),
         )])
-        fig_metrics.update_layout(title="Performance Metrics", margin=dict(l=20, r=10, t=30, b=10), height=950, font=dict(size=12))
+        fig_metrics.update_layout(title="Performance Metrics", margin=dict(l=20, r=10, t=30, b=10), height=980, font=dict(size=12))
         self.tables.append(fig_metrics)
 
 
@@ -246,7 +247,7 @@ class Statistics(object):
     </style>
 </head>
 <body>
-    <h4>QuantStats-Like Performance Report</h4>
+    <h4>{name}</h4>
     <div class="report-container">
         <div class="column left-column">
             {''.join(f'<div class="plot-container"><button class="fullscreen-btn" onclick="toggleFullscreen(this)">⛶</button>{g}</div>' for g in html_graphs)}
@@ -287,17 +288,19 @@ class Statistics(object):
 </body>
 </html>
 """
-
-        with open("quantstats.html", "w", encoding="utf-8") as f:
-            f.write(full_html)
-
-        # if self.chart:
-        #     self.chart.load()
-        #     if not iplot:
-        #         app_root = Path(sys.argv[0]).resolve().parent
-        #         html_code = os.path.join(app_root, 'test.html')
-        #         webbrowser.open(html_code)
-
+        if filename is None:
+            with tmpfilename() as fname:
+                with open(fname, "w", encoding="utf-8") as f:
+                    f.write(full_html)
+                if show:
+                    webbrowser.open(fname)
+        else:
+            app_root = Path(sys.argv[0]).resolve().parent
+            full_fname = os.path.join(app_root, filename)
+            with open(full_fname, "w", encoding="utf-8") as f:
+                    f.write(full_html)
+            if show:
+                webbrowser.open(full_fname)
 
 
 #### Figure Creation

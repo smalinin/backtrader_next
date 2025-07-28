@@ -1,8 +1,10 @@
 import bisect
 import collections
 import datetime
+from hashlib import file_digest
 import sys
 import time
+from tkinter import N
 import webbrowser
 import os
 from pathlib import Path
@@ -58,30 +60,35 @@ class Plot(with_metaclass(MetaParams, object)):
         self.chart = None
 
     def plot(self, stratlist, iplot=False,
-             start=None, end=None, width=None, height=None, show_eq=False, **kwargs):
+            start=None, end=None, width=None, height=None, show_eq=False,
+             show=True, filename=None, **kwargs):
+        if filename is None:
+            return
+
         for strategy in stratlist:
             if not isinstance(strategy, Strategy):
                 raise TypeError(f"Expected Strategy instance, got {type(strategy)}")
             else:
                 self.plot_one(strategy, iplot=iplot,
                             start=start, end=end, width=width, height=height,
-                            show_eq=show_eq, **kwargs)
-
+                            show_eq=show_eq, filename=filename, **kwargs)
         if self.chart:
             self.chart.load()
-            if not iplot:
+            if not iplot and show:
                 app_root = Path(sys.argv[0]).resolve().parent
-                html_code = os.path.join(app_root, 'test.html')
+                html_code = os.path.join(app_root, filename)
                 webbrowser.open(html_code)
 
 
     def plot_one(self, strategy, iplot=False,
-            start=None, end=None, width=None, height=None, show_eq=False,**kwargs):
+            start=None, end=None, width=None, height=None,
+            show_eq=False, filename=None, **kwargs):
 
         if not strategy.datas:
             return
-
         if not len(strategy):
+            return
+        if filename is None:
             return
 
         strat_name = strategy.__class__.__name__
@@ -185,7 +192,7 @@ class Plot(with_metaclass(MetaParams, object)):
 
             data_name = data._name if data._name else f'data{data._idx}'
             if self.chart is None:
-                self.chart = self.create_chart(c_top, iplot=iplot)
+                self.chart = self.create_chart(c_top, iplot=iplot, filename=filename)
 
             self.show(self.chart, xdates, c_top, c_up, c_data, c_down, strat_name, data_name)
         return None
@@ -193,8 +200,11 @@ class Plot(with_metaclass(MetaParams, object)):
     def prepare_trades_list(self, data_name:str):
         trades = self.performance.gen_trades(data_name, True) if self.performance else pd.DataFrame()
         orders = self.performance.gen_orders(data_name) if self.performance else pd.DataFrame()
-        df_lst = pd.merge(trades, orders, left_on='dateopen', right_on='o_datetime', how='outer')
-        lst = df_lst.to_dict(orient='records')
+        if trades.empty or orders.empty:
+            lst = []
+        else:
+            df_lst = pd.merge(trades, orders, left_on='dateopen', right_on='o_datetime', how='outer')
+            lst = df_lst.to_dict(orient='records')
         trades_lst = []
         size = 0
         for v in lst:
@@ -232,13 +242,13 @@ class Plot(with_metaclass(MetaParams, object)):
                 size += o_size
         return trades_lst
 
-    def create_chart(self, c_top, iplot=False):
+    def create_chart(self, c_top, filename, iplot=False):
         if iplot:
             chart = JupyterChart(width=1000, height=800,
                                 inner_height=-300 if c_top else -500)
         else:
             chart = HTMLChart_BN(width=1000, height=800,
-                            inner_height=-300 if c_top else -500)
+                            inner_height=-300 if c_top else -500, filename=filename)
         chart.legend(visible=True)
         chart.price_scale(perm_width=100)
         chart.fit()
@@ -276,9 +286,9 @@ class Plot(with_metaclass(MetaParams, object)):
                     i_style = 'dashed' if i_ls=='--' else 'solid'
                     i_color = ind.get('color', None)
                     if not ind.get('samecolor', False):
-                        self.pinf.nextcolor(0) #id)
+                        self.pinf.nextcolor(0)
                     if i_color is None:
-                        i_color = self.pinf.color(0) #id)
+                        i_color = self.pinf.color(0)
                     v_label = ind['label']
                     v_data = ind['data']
                     line = chart.create_histogram(v_label, price_line=False, price_label=False)
@@ -298,9 +308,9 @@ class Plot(with_metaclass(MetaParams, object)):
                     i_style = 'dashed' if i_ls=='--' else 'solid'
                     i_color = ind.get('color', None)
                     if not ind.get('samecolor', False):
-                        self.pinf.nextcolor(0) #id)
+                        self.pinf.nextcolor(0)
                     if i_color is None:
-                        i_color = self.pinf.color(0) #id)
+                        i_color = self.pinf.color(0)
                     v_label = ind['label']
                     v_data = ind['data']
                     line = chart.create_line(v_label, color=i_color, style=i_style, price_line=False, price_label=False)
@@ -347,17 +357,21 @@ class Plot(with_metaclass(MetaParams, object)):
         # Plot Trades
         if c_data and self.performance is not None:
             trades = self.performance.gen_trades(data_name)
-            orders = self.performance.gen_orders(data_name).groupby('o_datetime')['o_size'].sum().reset_index()
+            # orders = self.performance.gen_orders(data_name).groupby('o_datetime')['o_size'].sum().reset_index()
+            orders = self.performance.gen_orders(data_name)
             markers = list()
             for _, row in orders.iterrows():
                 size = row['o_size']
+                price = row['o_price']
                 shape = 'arrow_up' if size>0 else 'arrow_down'
                 color = 'lightgreen' if size>0 else 'red'
-                text = f'Buy @ {size}' if size>0 else f'Short @ {abs(size)}'
+                # text = f'Buy @ {size}' if size>0 else f'Short @ {abs(size)}'
+                text = f'Buy @ {price}' if size>0 else f'Short @ {price}'
                 markers.append(dict(time=row['o_datetime'], position='below', shape=shape, color=color, text=text))
+                markers.append(dict(time=row['o_datetime'], position='atPriceMiddle', shape='circle', color=color, text='', price=price, size=0.6))
             for _, row in trades.iterrows():
                 pnlcomm = row['pnlcomm']
-                shape = 'circle' if pnlcomm>0 else 'square'
+                shape = 'square'
                 color = 'yellow' if pnlcomm>0 else 'fuchsia'
                 text = '+Profit+' if pnlcomm>0 else '-Loss-'
                 markers.append(dict(time=row['dateclose'], position='above', shape=shape, color=color, text=text))
@@ -469,16 +483,8 @@ class Plot(with_metaclass(MetaParams, object)):
             if lineplotinfo._get('_plotskip', False):
                 continue
 
-            # Legend label only when plotting 1st line
-            if masterax and not ind.plotinfo.plotlinelabels:
-                label = indlabel * (not toskip) or ''
-                if label=='':
-                    label = indlabel + ' ' + linealias
-            else:
-                label = (indlabel + ' ') * (not toskip)
-                label += lineplotinfo._get('_name', '') or linealias
-
-            toskip -= 1  # one line less until legend can be added
+            label = (indlabel + ' ')
+            label += lineplotinfo._get('_name', '') or linealias
 
             # plot data
             lplot = line.plotrange(self.pinf.xstart, self.pinf.xend)
@@ -546,7 +552,6 @@ class Plot(with_metaclass(MetaParams, object)):
         volumes = data.volume.plotrange(self.pinf.xstart, self.pinf.xend)
 
         df_data = {
-            # 'time': xdates,
             'open': opens,
             'high': highs,
             'low': lows,
