@@ -154,12 +154,7 @@ class Eq(bt.Analyzer):
             return self.orders_df[self.orders_df['data_name'] == data_name]
 
     def compute_stats(self,
-            # trades: Union[List['Trade'], pd.DataFrame],
-            # equity: np.ndarray,
-            # ohlc_data: pd.DataFrame,
-            # strategy_instance: 'Strategy',
             risk_free_rate: float = 0.0,
-        # ) -> (pd.Series, StatsRes):
         ) -> pd.Series:
         assert -1 < risk_free_rate < 1
 
@@ -235,6 +230,12 @@ class Eq(bt.Analyzer):
         # Smart Sharpe Ratio
         skew = day_returns.skew()
         kurt = day_returns.kurt()  # Excess kurtosis
+        s.loc['Skew'] = skew.round(4)
+        s.loc['Kurtosis'] = kurt.round(4)
+        # Smart Sharpe Ratio is a modification of the Sharpe Ratio that accounts for skewness
+        # and kurtosis of the returns distribution. It is defined as:
+        # Smart Sharpe Ratio = Sharpe Ratio * (1 + (Skewness / 6) * Sharpe Ratio - (Kurtosis / 24) * (Sharpe Ratio ** 2))
+        # See: https://www.quantconnect.com/docs/v2/writing-algorithms/indicators/smart-sharpe-ratio
         s.loc['Smart Sharpe Ratio'] = (sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2))).round(4)
 
         # Our Sortino mismatches `empyrical.sortino_ratio()` because they use arithmetic mean return
@@ -242,43 +243,43 @@ class Eq(bt.Analyzer):
         _downside_std = np.sqrt(np.mean(_downside_returns ** 2))
         sortino_ratio = (annualized_mean_return - risk_free_rate) / (
                 _downside_std * np.sqrt(annual_trading_days)) if _downside_std != 0 else np.nan
-        s.loc['Sortino Ratio'] = (sortino_ratio).round(4)
+        s.loc['Sortino Ratio'] = round(sortino_ratio, 4) if not np.isnan(sortino_ratio) else np.nan
 
         # s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
         s.loc['VWR Ratio'] = (calc_vwr(eq_days=day_eq.to_numpy())).round(4)
         max_dd = -np.nan_to_num(dd_df.max())
-        s.loc['Calmar Ratio'] = ((annualized_return * 100) / abs(max_dd) if max_dd != 0 else np.nan).round(4)
+        s.loc['Calmar Ratio'] = round((annualized_return * 100) / abs(max_dd), 4) if max_dd != 0 else np.nan
 
         # total_return = (day_returns.add(1)).prod() - 1 # Wrong calc
         total_return = day_returns.sum()
-        s.loc['Recovery factor [%]'] = (abs(total_return) / abs(max_dd) * 100 if abs(max_dd) != 0 else np.nan).round(4)
+        s.loc['Recovery factor [%]'] = round(abs(total_return) / abs(max_dd) * 100, 4) if abs(max_dd) != 0 else np.nan
 
-        s.loc['Max. Drawdown [%]'] = (max_dd).round(4)
-        s.loc['Avg. Drawdown [%]'] = (-dd_peaks.mean()).round(4)
+        s.loc['Max. Drawdown [%]'] = round(max_dd, 4)
+        s.loc['Avg. Drawdown [%]'] = round(-dd_peaks.mean(), 4)
         s.loc['Max. Drawdown Duration'] = _round_timedelta(dd_dur.max())
         s.loc['Avg. Drawdown Duration'] = _round_timedelta(dd_dur.mean())
         s.loc['Drawdown Peak'] = dd_df.idxmax()
         s.loc['# Trades'] = n_trades = len(trades_df)
         win_rate = np.nan if not n_trades else (pl > 0).mean()
-        s.loc['Win Rate [%]'] = (win_rate * 100).round(4)
-        s.loc['Best Trade [%]'] = (returns_pct.max() * 100).round(4)
-        s.loc['Worst Trade [%]'] = (returns_pct.min() * 100).round(4)
+        s.loc['Win Rate [%]'] = round(win_rate * 100, 4)
+        s.loc['Best Trade [%]'] = round(returns_pct.max() * 100, 4)
+        s.loc['Worst Trade [%]'] = round(returns_pct.min() * 100, 4)
         mean_return = geometric_mean(returns_pct)
-        s.loc['Avg. Trade [%]'] = (mean_return * 100).round(4)
+        s.loc['Avg. Trade [%]'] = round(mean_return * 100, 4)
         s.loc['Max. Trade Duration'] = _round_timedelta(durations.max())
         s.loc['Avg. Trade Duration'] = _round_timedelta(durations.mean())
 
         gross_profit = day_returns[day_returns > 0].sum()
         gross_loss = abs(day_returns[day_returns < 0].sum())
-        s.loc['Profit Factor'] = (gross_profit / gross_loss if gross_loss != 0 else np.nan).round(4)
-        s.loc['Expectancy [%]'] = (day_returns.mean() * 100).round(4)
-        s.loc['SQN'] = (np.sqrt(n_trades) * pl.mean() / pl.std() if pl.std() != 0 else np.nan).round(4)
+        s.loc['Profit Factor'] = round(gross_profit / gross_loss, 4) if gross_loss != 0 else np.nan
+        s.loc['Expectancy [%]'] = round(day_returns.mean() * 100, 4)
+        s.loc['SQN'] = round(np.sqrt(n_trades) * pl.mean() / pl.std(), 4) if pl.std() != 0 else np.nan
 
         avg_win = pl[pl > 0].mean()
         avg_loss = -pl[pl < 0].mean()
         if avg_win is not np.nan and avg_loss > 0:
             b = avg_win / abs(avg_loss)
-            s.loc['Kelly Criterion [%]'] = ((win_rate - (1 - win_rate) / b) * 100).round(4)
+            s.loc['Kelly Criterion [%]'] = round((win_rate - (1 - win_rate) / b) * 100, 4)
         else:
             s.loc['Kelly Criterion [%]'] = np.nan
 
@@ -286,9 +287,6 @@ class Eq(bt.Analyzer):
         # s.loc['_equity_curve'] = equity_df
         # s.loc['_trades'] = trades_df
         #
-        # s = _Stats(s)
-        # return s, StatsRes(s, strategy_instance)
-        # print(s)
         return s
 
 
@@ -308,6 +306,10 @@ def compute_drawdown_duration_peaks(dd: pd.Series):
     df = df.reindex(dd.index)
     return df['duration'], df['peak_dd']
 
+
+def remove_outliers(returns, quantile=0.95):
+    """Returns series of returns without the outliers"""
+    return returns[returns < returns.quantile(quantile)]
 
 
 def geometric_mean(returns: pd.Series) -> float:
