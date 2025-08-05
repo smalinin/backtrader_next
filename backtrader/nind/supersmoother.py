@@ -19,7 +19,7 @@ class SuperSmoother(bt.Indicator):
 
     def __init__(self):
         self.addminperiod(3)
-        if new == 0:
+        if self.p.new == 0:
             # Ehlers version min phase shift and reversal sensitivity
             a1 = np.exp(-1.414 * np.pi / self.p.period)
             b1 = 2 * a1 * np.cos(1.414 * np.pi / self.p.period)
@@ -36,7 +36,9 @@ class SuperSmoother(bt.Indicator):
         if len(self) < 2:
             self.lines.ssf[0] = self.data[0]
         else:
-            val = self.c1 * (self.data[0] + self.data[-1]) / 2 + self.c2 * self.lines.ssf[-1] + self.c3 * self.lines.ssf[-2]
+            ssf_1 = self.lines.ssf[-1]
+            ssf_2 = self.lines.ssf[-2]
+            val = self.c1 * (self.data[0] + self.data[-1]) / 2 + self.c2 * (self.data[-1] if np.isnan(ssf_1) else ssf_1) + self.c3 * (self.data[-2] if np.isnan(ssf_2) else ssf_2)
             self.lines.ssf[0] = val
 
     def once(self, start, end):

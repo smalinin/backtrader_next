@@ -35,35 +35,26 @@ class MACD(bt.Indicator):
     		     )    
 
     def __init__(self):
-        self.addminperiod(self.p.slow_period + self.p.signal_period)
+        self.addminperiod(self.p.slow_period)
         self.fast_alpha = 2.0 / (self.p.fast_period + 1)
         self.slow_alpha = 2.0 / (self.p.slow_period + 1)
         self.signal_alpha = 2.0 / (self.p.signal_period + 1)
-        self._fast_ema = None
-        self._slow_ema = None
-        self._macd = None
-        self._signal_ema = None
+        self.min_size = max(self.p.fast_period, self.p.slow_period, self.p.signal_period) * 20 
 
 
     def next(self, status):
-        price = self.data[0]
+        closes = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
+        macd, signal, hist = compute_macd_numba(
+            closes,
+            self.fast_alpha, self.p.fast_period,
+            self.slow_alpha, self.p.slow_period,
+            self.signal_alpha, self.p.signal_period
+        )
 
-        if len(self.data) == self.p.slow_period:
-            closes = self.data.get(size=self.p.slow_period)
-            fast_seed = np.mean(closes[-self.p.fast_period:])
-            slow_seed = np.mean(closes)
-            macd = fast_seed - slow_seed
-            self.lines.macd[0] = macd
+        self.lines.macd[0] = macd[-1]
+        self.lines.signal[0] = signal[-1]
+        self.lines.hist[0] = hist[-1]
 
-        elif len(self.data) > self.p.slow_period:
-            self._fast_ema = self.fast_alpha * price + (1 - self.fast_alpha) * self._fast_ema
-            self._slow_ema = self.slow_alpha * price + (1 - self.slow_alpha) * self._slow_ema
-            self._macd = self._fast_ema - self._slow_ema
-            self._signal_ema = self.signal_alpha * self._macd + (1 - self.signal_alpha) * self._signal_ema
-
-            self.lines.macd[0] = self._macd
-            self.lines.signal[0] = self._signal_ema
-            self.lines.hist[0] = self._macd - self._signal_ema
 
 
     def once(self, start, end):
@@ -71,8 +62,6 @@ class MACD(bt.Indicator):
             return
 
         closes = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
-        if len(closes) < self.p.slow_period + self.p.signal_period:
-            return
 
         macd, signal, hist = compute_macd_numba(
             closes,

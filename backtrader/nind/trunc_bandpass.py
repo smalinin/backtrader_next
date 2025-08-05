@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import numba
 import backtrader as bt
@@ -8,17 +7,17 @@ __all__ = ['TruncBandPass']
 @numba.njit
 def compute_trunc_bandpass_numba(prices, period, bandwidth, length):
     n = len(prices)
-    trunc = np.zeros(n)
+    trunc = np.zeros(n, np.float64)
     if n < max(period, length):
         return trunc
     
     # Precompute constants
-    L1 = math.cos(2 * math.pi / period)
-    G1 = math.cos(bandwidth * 2 * math.pi / period)
-    S1 = 1.0 / G1 - math.sqrt(1.0 / (G1 * G1) - 1.0) if G1 != 0 else 0.0
+    L1 = np.cos(2 * np.pi / period)
+    G1 = np.cos(bandwidth * 2 * np.pi / period)
+    S1 = 1.0 / G1 - np.sqrt(1.0 / (G1 * G1) - 1.0) if G1 != 0 else 0.0
     
     # Temporary buffer for calculations
-    trunc_buf = np.zeros(101)
+    trunc_buf = np.zeros(101, np.float64)
     
     for i in range(max(period, length) - 1, n):
         # Shift buffer to the right
@@ -54,7 +53,7 @@ class TruncBandPass(bt.Indicator):
         # Validate parameters
         self.p.period = max(self.p.period, 3)
         self.p.length = min(max(self.p.length, 1), 98)  # 1-98 to fit in buffer
-        min_period = max(self.p.period, self.p.length) + 2
+        min_period = max(self.p.period, self.p.length, 2)
         self.addminperiod(min_period)
 
         # Initialize calculation buffer

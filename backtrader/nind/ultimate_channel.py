@@ -1,7 +1,6 @@
 import numpy as np
 import numba
 import backtrader as bt
-import math
 from .utils import compute_ultimate_smoother_numba
 
 __all__ = ['UltimateChannel']
@@ -23,11 +22,11 @@ def compute_ultimate_channel_numba(closes, highs, lows, str_length, length, num_
     
     # Calculate True High and True Low
     true_range = np.empty(n, dtype=np.float64)
+    true_range[0] = highs[0] - lows[0]
     
     # Initialize first values
     th = highs[0]
     tl = lows[0]
-    true_range[0] = highs[0] - lows[0]
     
     for i in range(1, n):
         # TH = max(high, previous close)
@@ -47,16 +46,16 @@ def compute_ultimate_channel_numba(closes, highs, lows, str_length, length, num_
     # Calculate STR using Ultimate Smoother on True Range
     str_values = compute_ultimate_smoother_numba(true_range, str_length)
     
-    # Calculate smoothed close
     smoothed_close = compute_ultimate_smoother_numba(closes, length)
     
-    # Calculate channels
     upper_channel = np.empty(n, dtype=np.float64)
     lower_channel = np.empty(n, dtype=np.float64)
     
-    for i in range(n):
-        upper_channel[i] = smoothed_close[i] + num_strs * str_values[i]
-        lower_channel[i] = smoothed_close[i] - num_strs * str_values[i]
+    #for i in range(n):
+    #    upper_channel[i] = smoothed_close[i] + num_strs * str_values[i]
+    #    lower_channel[i] = smoothed_close[i] - num_strs * str_values[i]
+    upper_channel = smoothed_close + num_strs * str_values
+    lower_channel = smoothed_close - num_strs * str_values
     
     return upper_channel, lower_channel, smoothed_close, str_values
 
@@ -102,29 +101,20 @@ class UltimateChannel(bt.Indicator):
     )
 
     def __init__(self):
-        # Minimum period needed for calculations
-        self.lookback = max(self.p.str_length, self.p.length, 3)
-        self.addminperiod(self.lookback)
-        self.min_size = self.lookback * 5
+        self.addminperiod(max(self.p.str_length, self.p.length, 3))
+        self.min_size = max(self.p.str_length, self.p.length, 3) * 20
 
     def next(self, status):
-        """
-        Calculate Ultimate Channel values for real-time data (bar by bar)
-        """
-        # Need enough data for calculations
         closes = np.asarray(self.data.close.get_array(self.min_size), dtype=np.float64)
-        if len(closes) < self.lookback:
-            return
+
         highs = np.asarray(self.data.high.get_array(self.min_size), dtype=np.float64)
         lows = np.asarray(self.data.low.get_array(self.min_size), dtype=np.float64)
             
-        # Calculate using numba function
         upper, lower, middle, str_val = compute_ultimate_channel_numba(
             closes, highs, lows, 
             self.p.str_length, self.p.length, self.p.num_strs
         )
         
-        # Set current values (last calculated values)
         self.lines.upper[0] = upper[-1]
         self.lines.lower[0] = lower[-1]
         self.lines.middle[0] = middle[-1]
@@ -134,23 +124,15 @@ class UltimateChannel(bt.Indicator):
         if end-start==1:
             return
 
-        """
-        Calculate Ultimate Channel values for historical data (batch processing)
-        """
         closes = np.asarray(self.data.close.get_array_preloaded(), dtype=np.float64)
         highs = np.asarray(self.data.high.get_array_preloaded(), dtype=np.float64)
         lows = np.asarray(self.data.low.get_array_preloaded(), dtype=np.float64)
         
-        if len(closes) < max(3, self.lookback):
-            return
-
-        # Calculate using numba-optimized function
         upper, lower, middle, str_values = compute_ultimate_channel_numba(
             closes, highs, lows,
             self.p.str_length, self.p.length, self.p.num_strs
         )
         
-        # Set the calculated values to the indicator lines
         self.lines.upper.ndbuffer(upper)
         self.lines.lower.ndbuffer(lower)
         self.lines.middle.ndbuffer(middle)

@@ -14,10 +14,10 @@ class RoofingFilter(bt.Indicator):
       - High-pass filter
       - SuperSmoother filter on the result of the high-pass
     '''
-    lines = ('roof', 'hp',)
+    lines = ('roof',)
     params = (
-        ('hp_period', 48),  # High-pass period
         ('lp_period', 10),  # Low-pass (SuperSmoother) period
+        ('hp_period', 48),  # High-pass period
     )
 
     plotinfo = dict(hp=dict(_plot=False))  # Do not plot the hp line
@@ -33,12 +33,9 @@ class RoofingFilter(bt.Indicator):
 
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
 
-        hp_values, roof_values = compute_roofing_filter_numba(
-            series,
-            self.p.hp_period,
-            self.p.lp_period
+        roof_values = compute_roofing_filter_numba(series,
+            self.p.lp_period, self.p.hp_period
         )
-        self.lines.hp[0] = hp_values[-1]
         self.lines.roof[0] = roof_values[-1]
 
 
@@ -50,11 +47,8 @@ class RoofingFilter(bt.Indicator):
         if len(series) < 3:
             return
 
-        hp_values, roof_values = compute_roofing_filter_numba(
-            series,
-            self.p.hp_period,
-            self.p.lp_period
+        roof_values = compute_roofing_filter_numba(series,
+            self.p.lp_period, self.p.hp_period
         )
 
-        self.lines.hp.ndbuffer(hp_values)
         self.lines.roof.ndbuffer(roof_values)

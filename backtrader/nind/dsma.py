@@ -13,14 +13,13 @@ def rolling_rms_numba(filt, period):
     rms = np.full(n, np.nan)
     
     for i in range(period - 1, n):
-        sum_squares = 0.0
+        rms_val = 0.0
         for j in range(period):
             if i - j >= 0:
-                sum_squares += filt[i - j] ** 2
-        rms[i] = np.sqrt(sum_squares / period)
+                rms_val += filt[i - j] ** 2
+        rms[i] = np.sqrt(rms_val / period)
     
     return rms
-
 
 @numba.njit
 def compute_dsma_numba(series, period, k=5.0):
@@ -38,27 +37,21 @@ def compute_dsma_numba(series, period, k=5.0):
     """
     n = len(series)
     
-    # Initialize arrays
     zeros = np.zeros_like(series)
     dsma = np.zeros_like(series)
     
-    if n < 2:
+    if n < 3:
         return dsma
     
-    # 1. Calculate 2-period difference (zeros in C# code)
     for i in range(2, n):
         diff = series[i] - series[i - 2]
         if np.isnan(diff) or np.isinf(diff):
             diff = 0.0
         zeros[i] = diff
-    
-    # 2. Apply SuperSmoother filter to the difference
+
     filt = compute_ssf_numba(zeros, period)
-    
-    # 3. Calculate rolling RMS of the filtered values
     rms = rolling_rms_numba(filt, period)
     
-    # 4. Calculate DSMA
     dsma[0] = series[0] if n > 0 else 0.0
     
     for i in range(1, n):
@@ -66,7 +59,7 @@ def compute_dsma_numba(series, period, k=5.0):
             dsma[i] = 0.0
         else:
             # Calculate adaptive alpha
-            if rms[i] > 0 and not np.isnan(rms[i]):
+            if rms[i] > 1e-9 and not np.isnan(rms[i]):
                 alpha = np.abs(filt[i] / rms[i]) * k / period
             else:
                 alpha = 0.0
@@ -85,6 +78,7 @@ def compute_dsma_numba(series, period, k=5.0):
             dsma[i] = dsma_val
     
     return dsma
+
 
 
 class DSMA(bt.Indicator):
@@ -110,21 +104,13 @@ class DSMA(bt.Indicator):
 
     def __init__(self):
         self.addminperiod(self.p.period + 2)  # +2 for the 2-period difference
-        self.min_size = self.p.period * 5
+        self.min_size = self.p.period * 20
 
     def next(self, status):
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
-        if len(series) < self.p.period + 2:
-            return
-
-        # Calculate DSMA for the entire available data
         dsma_values = compute_dsma_numba(series, self.p.period, self.p.k)
         
-        # Set the current value
-        if len(dsma_values) > 0:
-            self.lines.dsma[0] = dsma_values[-1]
-        else:
-            self.lines.dsma[0] = 0.0
+        self.lines.dsma[0] = dsma_values[-1]
 
     def once(self, start, end):
         if end-start==1:

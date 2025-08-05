@@ -28,8 +28,7 @@ class SecondDerivative(bt.Indicator):
         self.addminperiod(3)
 
     def next(self, status):
-        closes = np.asarray(self.data.get_array(3), dtype=np.float64)
-        self.lines.sd[0] = closes[0] - 2 * closes[-1] + closes[-2]  #BUG
+        self.lines.sd[0] = self.data[0] - 2 * self.data[-1] + self.data[-2]
 
     def once(self, start, end):
         if end-start==1:

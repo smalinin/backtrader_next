@@ -27,16 +27,13 @@ class ROC(bt.Indicator):
         self.addminperiod(self.p.period)
 
     def next(self, status):
-        series = np.asarray(self.data.get_array(self.p.period), dtype=np.float64)
-        self.lines.roc[0] = (series[0] - series[-self.p.period]) / series[-self.p.period] ##BUG
+        self.lines.roc[0] = (self.data[0] - self.data[-self.p.period]) / self.data[-self.p.period]
 
     def once(self, start, end):
         if end-start==1:
             return
 
         series = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
-        if len(series) < self.p.period:
-            return
 
         roc = compute_roc_numba(series, self.p.period)
         self.lines.roc.ndbuffer(roc)

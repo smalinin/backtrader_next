@@ -1,4 +1,3 @@
-import math
 import numpy as np
 import numba
 import backtrader as bt
@@ -14,9 +13,9 @@ def compute_bandpass_numba(prices, period, bandwidth):
         return bandpass
     
     # Precompute constants
-    L1 = math.cos(2 * math.pi / period)
-    G1 = math.cos(bandwidth * 2 * math.pi / period)
-    S1 = 1.0 / G1 - math.sqrt(1.0 / (G1 * G1) - 1.0) if G1 != 0 else 0.0
+    L1 = np.cos(2 * np.pi / period)
+    G1 = np.cos(bandwidth * 2 * np.pi / period)
+    S1 = 1.0 / G1 - np.sqrt(1.0 / (G1 * G1) - 1.0) if G1 != 0 else 0.0
     
     # Start calculation from period+1 index
     # for i in range(period + 1, n):
@@ -36,7 +35,6 @@ class BandPass(bt.Indicator):
     )
 
     def __init__(self):
-        # Validate and adjust parameters
         self.p.period = max(self.p.period, 3)
         self.addminperiod(self.p.period + 2)  # Minimum required bars
 

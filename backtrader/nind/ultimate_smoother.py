@@ -1,7 +1,6 @@
 import numpy as np
 import numba
 import backtrader as bt
-import math
 from .utils import compute_ultimate_smoother_numba
 
 __all__ = ['UltimateSmoother']
@@ -32,22 +31,9 @@ class UltimateSmoother(bt.Indicator):
 
     def __init__(self):
         self.addminperiod(3)
-        self.min_size = self.p.period * 5
+        self.min_size = self.p.period * 20
         
-        # Pre-calculate coefficients
-        #a = math.exp(-1.414213562373095 * math.pi / self.p.period)
-        #self.c2 = 2.0 * a * math.cos(1.414213562373095 * math.pi / self.p.period)
-        #self.c3 = -a * a
-        #self.c1 = 1.0 - self.c2 - self.c3
-
     def next(self, status):
-        """
-        Calculate Ultimate Smoother value for streaming data (real-time)
-        """
-        if len(self.data) < 3:
-            return
-
-        # Get recent data for smoothing calculations
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
 
         smoothed = compute_ultimate_smoother_numba(series, self.p.period)
@@ -58,14 +44,7 @@ class UltimateSmoother(bt.Indicator):
         if end-start==1:
             return
 
-        """
-        Calculate Ultimate Smoother values for historical data (batch processing)
-        """
         series = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
-        if len(series) < 3:
-            return
-
-        # Calculate using numba-optimized function
         smoother_values = compute_ultimate_smoother_numba(series, self.p.period)
         
         self.lines.usmoother.ndbuffer(smoother_values)

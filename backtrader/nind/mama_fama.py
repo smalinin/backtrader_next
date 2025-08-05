@@ -127,7 +127,7 @@ class MAMA_FAMA(bt.Indicator):
         self.addminperiod(6)
         self.fast_limit = self.p.fast_limit
         self.slow_limit = self.p.slow_limit
-        self.min_size = round((2/self.p.slow_limit - 1) * 5)
+        self.min_size = round((2/self.p.slow_limit - 1) * 20)
 
     def next(self, status):
         highs = np.asarray(self.data.high.get_array(self.min_size), dtype=np.float64)
