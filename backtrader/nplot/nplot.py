@@ -16,14 +16,14 @@ from backtrader import order
 from backtrader.strategy import Strategy
 from backtrader.analyzers.eq import Eq
 from backtrader.utils.dateintern import format_datetime
-from lightweight_charts.util import MARKER_POSITION
+from bn_lightweight_charts.util import MARKER_POSITION
 
 from ..utils.py3 import with_metaclass
 from ..utils.date import format_datetime
 from .. import AutoInfoClass, MetaParams, TimeFrame, date2num, num2date
 from .nscheme import PlotScheme
 
-from lightweight_charts.widgets import HTMLChart_BN, JupyterChart
+from bn_lightweight_charts.widgets import HTMLChart_BN, JupyterChart
 
 #TODO add plot observers
 

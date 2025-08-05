@@ -138,6 +138,7 @@ class LineBuffer(LineSingle):
             self.useislice = True
         elif self.mode == self.NDBuffer:
             self.useislice = False
+            self.array = array.array(str('d'))
         else:
             self.array = array.array(str('d'))
             self.useislice = False
@@ -155,14 +156,14 @@ class LineBuffer(LineSingle):
 
     def ndbuffer(self, arr=None): 
         self.mode = self.NDBuffer
-        if arr is not None:
-            self.array = arr
         self.maxlen = self._minperiod
         self.extrasize = 0
         self.lenmark = self.maxlen - (not self.extrasize)
         self.idx = -1
         self.lencount = 0
         self.reset()
+        if arr is not None:
+            self.array = arr
 
     def getindicators(self):
         return []

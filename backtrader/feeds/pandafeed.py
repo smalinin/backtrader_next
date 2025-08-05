@@ -223,7 +223,9 @@ class PandasData(feed.DataBase):
             if self.p.todate is not None:
                 self.p.dataframe = self.p.dataframe[ self.p.dataframe[coldtime].dt.date <= self.p.todate ].copy()
 
-
+    def reset(self):
+        super(PandasData, self).reset()
+        self._preloaded = False
 
     def start(self):
         super(PandasData, self).start()
