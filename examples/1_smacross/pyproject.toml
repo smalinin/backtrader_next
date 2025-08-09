@@ -1,0 +1,13 @@
+[project]
+name = "1_smacross"
+version = "0.1.0"
+description = "Sample of smacross strategy"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "backtrader-next",
+]
+
+[tool.uv.sources]
+backtrader-next = { path = "../../" }
+
