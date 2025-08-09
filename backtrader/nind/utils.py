@@ -54,8 +54,8 @@ def compute_ssf_numba(series, period):
     return ssf
 
 
-@numba.njit
-def compute_hp2_filter_numba(series, hp_period):
+@numba.njit    
+def compute_highpass2_numba(series, hp_period):
     # Ehlers High-pass filter
     alpha1 = (np.cos(1.414 * np.pi / hp_period) + np.sin(1.414 * np.pi / hp_period) - 1) / np.cos(1.414 * np.pi / hp_period)
     
@@ -73,7 +73,7 @@ def compute_roofing_filter_numba(series, lp_period, hp_period):
     # Ehlers Roofing Filter:
     # 1. High-pass filter
     # 2. SuperSmoother filter on the result of the high-pass
-    hp = compute_hp2_filter_numba(series, hp_period)
+    hp = compute_highpass1_numba(series, hp_period)
 
     # Then apply SuperSmoother to HP result (low-pass)
     roof = compute_ssf_numba(hp, lp_period)
@@ -83,41 +83,30 @@ def compute_roofing_filter_numba(series, lp_period, hp_period):
 @numba.njit
 def compute_highpass1_numba(series: np.ndarray, period: float) -> np.ndarray:
     """
-        a1 = exp(-1.414 · π / period)
-        b1 = 2 · a1 · cos(1.414 · π / period)
-        c2 = b1
-        c3 = -a1²
-        c1 = (1 + c2 - c3) / 4
-
-    HP[i] = 
-      c1 * (series[i] - 2·series[i-1] + series[i-2]) 
-      + c2·HP[i-1] + c3·HP[i-2]     , for i >= 4  
-    HP[i] = series[i] , for i < 4
+    Ehlers' Single Pole High Pass Filter
     """
     n = len(series)
-    hp = np.zeros(n, np.float64)
+    hp = np.zeros(n, dtype=np.float64)
 
-    if n < 4:
+    if n < 2:
         for i in range(n):
             hp[i] = series[i]
         return hp
 
-    a1 = np.exp(-1.414 * np.pi / period)
-    b1 = 2.0 * a1 * np.cos(1.414 * np.pi / period)
-    c2 = b1
-    c3 = -a1 * a1
-    c1 = 0.25 * (1.0 + c2 - c3)
+    angle = 1.414 * np.pi / period
+    cos_a = np.cos(angle)
+    sin_a = np.sin(angle)
+    alpha = (cos_a + sin_a - 1.0 ) / cos_a
 
-    hp[0] = hp[1] = hp[2] = hp[3] = 0.0
+    b0 = 0.5 * (1.0 + alpha)
+    b1 = -0.5 * (1.0 + alpha)
+    a1 = -alpha
 
-    for i in range(4, n):
-        hp[i] = (
-            c1 * (series[i] - 2.0 * series[i - 1] + series[i - 2])
-            + c2 * hp[i - 1]
-            + c3 * hp[i - 2]
-        )
+    for i in range(1, n):
+        hp[i] = (b0 * series[i] + b1 * series[i - 1] - a1 * hp[i - 1])
 
     return hp
+
 
 
 @numba.njit
