@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import webbrowser
 import os
+import sys
 from pathlib import Path
 from .utils import tmpfilename
 
