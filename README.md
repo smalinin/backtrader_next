@@ -1,6 +1,6 @@
 <div align="center">
 
-#backtrader-next
+# backtrader-next
 
 [![PyPi Release](https://img.shields.io/pypi/v/backtrader_next?color=32a852&label=PyPi)](https://pypi.org/project/backtrader_next/)
 [![Made with Python](https://img.shields.io/badge/Python-3.8+-c7a002?logo=python&logoColor=white)](https://python.org "Go to Python homepage")
