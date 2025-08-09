@@ -1,8 +1,19 @@
 [project]
-name = "backtrader-next"
+name = "backtrader_next"
 version = "0.1.0"
 description = "Live Trading and backtesting platform in Python"
 readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors = [
+    { name = "smalinin"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+]
+
 requires-python = ">=3.12"
 dependencies = [
     "bn-lightweight-charts>=0.2.1",
@@ -12,3 +23,10 @@ dependencies = [
     "plotly>=6.1.2",
 ]
 
+[project.urls]
+"Homepage" = "https://github.com/smalinin/backtrader_next"
+"Source" = "https://github.com/smalinin/backtrader_next"
+
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
