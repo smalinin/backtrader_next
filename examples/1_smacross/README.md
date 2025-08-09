@@ -1,4 +1,7 @@
 ## How to run
+
+#### Notes. Only `PandasData` feed is optimized for testing performance for `runonce=True`
+
 #### Execute next command for smacross sample
 Note: You must have [UV ](https://docs.astral.sh/uv/getting-started/installation/) package manager 
 ```
