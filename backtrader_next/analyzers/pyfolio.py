@@ -24,8 +24,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import collections
 
-import backtrader as bt
-from backtrader.utils.py3 import items, iteritems
+import backtrader_next as bt
+from backtrader_next.utils.py3 import items, iteritems
 
 from . import TimeReturn, PositionsValue, Transactions, GrossLeverage
 
@@ -107,7 +107,7 @@ class PyFolio(bt.Analyzer):
 
         Because the objects are meant to be used as direct input to ``pyfolio``
         this method makes a local import of ``pandas`` to convert the internal
-        *backtrader* results to *pandas DataFrames* which is the expected input
+        *backtrader_next* results to *pandas DataFrames* which is the expected input
         by, for example, ``pyfolio.create_full_tear_sheet``
 
         The method will break if ``pandas`` is not installed

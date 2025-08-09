@@ -31,7 +31,7 @@ try:  # For new Python versions
 except AttributeError:  # For old Python versions
     collectionsAbc = collections  # Используем collections.Iterable
 
-import backtrader as bt
+import backtrader_next as bt
 from .utils.py3 import (with_metaclass, string_types, integer_types)
 
 from . import linebuffer
@@ -854,7 +854,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         Notice that ``period`` is still passed as an iterable ... of just 1
         element
 
-        ``backtrader`` will anyhow try to identify situations like:
+        ``backtrader_next`` will anyhow try to identify situations like:
 
           - cerebro.optstrategy(MyStrategy, period=15)
 

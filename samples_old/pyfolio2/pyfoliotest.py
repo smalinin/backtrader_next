@@ -27,7 +27,7 @@ import collections
 import datetime
 
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 class St(bt.SignalStrategy):

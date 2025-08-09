@@ -21,7 +21,7 @@
 #
 ###############################################################################
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 __all__ = ['Fractal']

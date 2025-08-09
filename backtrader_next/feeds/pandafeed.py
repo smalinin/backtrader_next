@@ -21,10 +21,10 @@
 # from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 from array import array
-from backtrader.utils.py3 import string_types, integer_types
+from backtrader_next.utils.py3 import string_types, integer_types
 
-from backtrader import date2num
-import backtrader.feed as feed
+from backtrader_next import date2num
+import backtrader_next.feed as feed
 
 import numpy as np
 

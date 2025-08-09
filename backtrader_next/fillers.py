@@ -21,9 +21,9 @@
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 
-from backtrader.utils.py3 import MAXINT, with_metaclass
+from backtrader_next.utils.py3 import MAXINT, with_metaclass
 
-from backtrader.metabase import MetaParams
+from backtrader_next.metabase import MetaParams
 
 
 class FixedSize(with_metaclass(MetaParams, object)):

@@ -24,7 +24,7 @@ from __future__ import (absolute_import, division, print_function,
 import collections
 import math
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 __all__ = ['LogReturnsRolling']

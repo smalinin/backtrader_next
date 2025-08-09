@@ -23,7 +23,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import os.path
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 class VChartFile(bt.Store):
@@ -56,7 +56,7 @@ class VChartFile(bt.Store):
 
         VC_NONE = ''
 
-        from backtrader.utils.py3 import winreg
+        from backtrader_next.utils.py3 import winreg
         if winreg is None:
             return VC_NONE
 

@@ -24,7 +24,7 @@ from __future__ import (absolute_import, division, print_function,
 import collections
 from datetime import datetime, timedelta
 
-from backtrader import AbstractDataBase, TimeFrame
+from backtrader_next import AbstractDataBase, TimeFrame
 
 
 class DataFiller(AbstractDataBase):

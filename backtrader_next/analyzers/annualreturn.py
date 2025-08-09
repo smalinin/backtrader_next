@@ -23,7 +23,7 @@ from __future__ import (absolute_import, division, print_function,
 
 from collections import OrderedDict
 
-from backtrader import Analyzer
+from backtrader_next import Analyzer
 
 
 class AnnualReturn(Analyzer):

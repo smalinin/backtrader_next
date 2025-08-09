@@ -26,16 +26,16 @@ from copy import copy
 from datetime import date, datetime, timedelta
 import threading
 
-from backtrader.feed import DataBase
-from backtrader import (TimeFrame, num2date, date2num, BrokerBase,
+from backtrader_next.feed import DataBase
+from backtrader_next import (TimeFrame, num2date, date2num, BrokerBase,
                         Order, BuyOrder, SellOrder, OrderBase, OrderData)
-from backtrader.utils.py3 import bytes, with_metaclass, MAXFLOAT
-from backtrader.metabase import MetaParams
-from backtrader.comminfo import CommInfoBase
-from backtrader.position import Position
-from backtrader.stores import oandastore
-from backtrader.utils import AutoDict, AutoOrderedDict
-from backtrader.comminfo import CommInfoBase
+from backtrader_next.utils.py3 import bytes, with_metaclass, MAXFLOAT
+from backtrader_next.metabase import MetaParams
+from backtrader_next.comminfo import CommInfoBase
+from backtrader_next.position import Position
+from backtrader_next.stores import oandastore
+from backtrader_next.utils import AutoDict, AutoOrderedDict
+from backtrader_next.comminfo import CommInfoBase
 
 
 class OandaCommInfo(CommInfoBase):
@@ -61,7 +61,7 @@ class OandaBroker(with_metaclass(MetaOandaBroker, BrokerBase)):
     '''Broker implementation for Oanda.
 
     This class maps the orders/positions from Oanda to the
-    internal API of ``backtrader``.
+    internal API of ``backtrader_next``.
 
     Params:
 

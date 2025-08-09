@@ -33,7 +33,7 @@ import pandas as pd
 from .utils.py3 import (keys, integer_types, iteritems, itervalues,
                         MAXINT, string_types, with_metaclass)
 
-import backtrader as bt
+import backtrader_next as bt
 from .lineiterator import LineIterator, StrategyBase
 from .lineroot import LineSingle
 from .lineseries import LineSeriesStub
@@ -890,12 +890,12 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
               - ``numeric value``: This is assumed to be a value corresponding
                 to a datetime in ``matplotlib`` coding (the one used by
-                ``backtrader``) and will used to generate an order valid until
+                ``backtrader_next``) and will used to generate an order valid until
                 that time (*good till date*)
 
           - ``tradeid`` (default: ``0``)
 
-            This is an internal value applied by ``backtrader`` to keep track
+            This is an internal value applied by ``backtrader_next`` to keep track
             of overlapping trades on the same asset. This ``tradeid`` is sent
             back to the *strategy* when notifying changes to the status of the
             orders.
@@ -924,16 +924,16 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             children, which triggers the full placement of all bracket orders.
 
           - ``**kwargs``: additional broker implementations may support extra
-            parameters. ``backtrader`` will pass the *kwargs* down to the
+            parameters. ``backtrader_next`` will pass the *kwargs* down to the
             created order objects
 
             Example: if the 4 order execution types directly supported by
-            ``backtrader`` are not enough, in the case of for example
+            ``backtrader_next`` are not enough, in the case of for example
             *Interactive Brokers* the following could be passed as *kwargs*::
 
               orderType='LIT', lmtPrice=10.0, auxPrice=9.8
 
-            This would override the settings created by ``backtrader`` and
+            This would override the settings created by ``backtrader_next`` and
             generate a ``LIMIT IF TOUCHED`` order with a *touched* price of 9.8
             and a *limit* price of 10.0.
 
@@ -1101,7 +1101,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             top of this.
 
           - ``**kwargs``: additional broker implementations may support extra
-            parameters. ``backtrader`` will pass the *kwargs* down to the
+            parameters. ``backtrader_next`` will pass the *kwargs* down to the
             created order objects
 
             Possible values: (see the documentation for the method ``buy``

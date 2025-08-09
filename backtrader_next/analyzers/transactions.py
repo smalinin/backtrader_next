@@ -24,8 +24,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import collections
 
-import backtrader as bt
-from backtrader import Order, Position
+import backtrader_next as bt
+from backtrader_next import Order, Position
 
 
 class Transactions(bt.Analyzer):

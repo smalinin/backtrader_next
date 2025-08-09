@@ -23,12 +23,12 @@ from __future__ import (absolute_import, division, print_function,
 
 from datetime import datetime, timedelta
 
-from backtrader.feed import DataBase
-from backtrader import TimeFrame, date2num, num2date
-from backtrader.utils.py3 import (integer_types, queue, string_types,
+from backtrader_next.feed import DataBase
+from backtrader_next import TimeFrame, date2num, num2date
+from backtrader_next.utils.py3 import (integer_types, queue, string_types,
                                   with_metaclass)
-from backtrader.metabase import MetaParams
-from backtrader.stores import oandastore
+from backtrader_next.metabase import MetaParams
+from backtrader_next.stores import oandastore
 
 
 class MetaOandaData(DataBase.__class__):

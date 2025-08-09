@@ -24,10 +24,10 @@ from __future__ import (absolute_import, division, print_function,
 import argparse
 import datetime
 
-import backtrader as bt
-import backtrader.feeds as btfeeds
-import backtrader.indicators as btind
-import backtrader.utils.flushfile
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
+import backtrader_next.indicators as btind
+import backtrader_next.utils.flushfile
 
 # from wkdaysfiller import WeekDaysFiller
 from weekdaysfiller import WeekDaysFiller

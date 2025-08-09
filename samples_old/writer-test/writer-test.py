@@ -25,10 +25,10 @@ import argparse
 import datetime
 
 # The above could be sent to an independent module
-import backtrader as bt
-import backtrader.feeds as btfeeds
-import backtrader.indicators as btind
-from backtrader.analyzers import SQN
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
+import backtrader_next.indicators as btind
+from backtrader_next.analyzers import SQN
 
 
 class LongShortStrategy(bt.Strategy):

@@ -31,8 +31,8 @@ try:  # For new Python versions
 except AttributeError:  # For old Python versions
     collectionsAbc = collections  # Используем collections.Iterable
 
-import backtrader as bt
-from backtrader.utils.py3 import (with_metaclass, string_types, integer_types)
+import backtrader_next as bt
+from backtrader_next.utils.py3 import (with_metaclass, string_types, integer_types)
 
 
 class WriterBase(with_metaclass(bt.MetaParams, object)):

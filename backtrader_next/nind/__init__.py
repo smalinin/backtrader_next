@@ -1,4 +1,9 @@
-from backtrader import Indicator
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+
+from backtrader_next import Indicator
 
 # The modules below should/must define __all__ with the Indicator objects
 # of prepend an "_" (underscore) to private classes/variables

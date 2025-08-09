@@ -25,14 +25,14 @@ import collections
 from datetime import date, datetime, timedelta
 import threading
 
-from backtrader import BrokerBase, Order, BuyOrder, SellOrder
-from backtrader.comminfo import CommInfoBase
-from backtrader.feed import DataBase
-from backtrader.metabase import MetaParams
-from backtrader.position import Position
-from backtrader.utils.py3 import with_metaclass
+from backtrader_next import BrokerBase, Order, BuyOrder, SellOrder
+from backtrader_next.comminfo import CommInfoBase
+from backtrader_next.feed import DataBase
+from backtrader_next.metabase import MetaParams
+from backtrader_next.position import Position
+from backtrader_next.utils.py3 import with_metaclass
 
-from backtrader.stores import vcstore
+from backtrader_next.stores import vcstore
 
 
 class VCCommInfo(CommInfoBase):
@@ -71,7 +71,7 @@ class VCBroker(with_metaclass(MetaVCBroker, BrokerBase)):
     '''Broker implementation for VisualChart.
 
     This class maps the orders/positions from VisualChart to the
-    internal API of ``backtrader``.
+    internal API of ``backtrader_next``.
 
     Params:
 
@@ -370,7 +370,7 @@ class VCBroker(with_metaclass(MetaVCBroker, BrokerBase)):
                 break
 
     def OnModifiedOrder(self, Order):
-        # We are not expecting this: unless backtrader starts implementing
+        # We are not expecting this: unless backtrader_next starts implementing
         # modify order method
         pass
 

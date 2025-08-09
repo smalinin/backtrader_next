@@ -1,6 +1,11 @@
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+
 import numpy as np
 import numba
-import backtrader as bt
+import backtrader_next as bt
 from .utils import compute_ssf_numba
 
 __all__ = ['CorrelationTrendSS']

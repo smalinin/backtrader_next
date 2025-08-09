@@ -309,7 +309,7 @@ class CommissionInfo(CommInfoBase):
     '''Base Class for the actual Commission Schemes.
 
     CommInfoBase was created to keep suppor for the original, incomplete,
-    support provided by *backtrader*. New commission schemes derive from this
+    support provided by *backtrader_next*. New commission schemes derive from this
     class which subclasses ``CommInfoBase``.
 
     The default value of ``percabs`` is also changed to ``True``

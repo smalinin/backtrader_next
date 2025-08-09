@@ -23,11 +23,11 @@ from __future__ import (absolute_import, division, print_function,
 
 import math
 
-from backtrader.utils.py3 import itervalues
+from backtrader_next.utils.py3 import itervalues
 
-from backtrader import Analyzer, TimeFrame
-from backtrader.mathsupport import average, standarddev
-from backtrader.analyzers import TimeReturn, AnnualReturn
+from backtrader_next import Analyzer, TimeFrame
+from backtrader_next.mathsupport import average, standarddev
+from backtrader_next.analyzers import TimeReturn, AnnualReturn
 
 
 class SharpeRatio(Analyzer):

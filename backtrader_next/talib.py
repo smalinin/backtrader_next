@@ -25,8 +25,8 @@ from __future__ import (absolute_import, division, print_function, unicode_liter
 
 import sys
 
-import backtrader as bt
-from backtrader.utils.py3 import with_metaclass
+import backtrader_next as bt
+from backtrader_next.utils.py3 import with_metaclass
 
 
 try:

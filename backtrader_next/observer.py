@@ -22,7 +22,7 @@ from __future__ import (absolute_import, division, print_function, unicode_liter
 
 
 from .lineiterator import LineIterator, ObserverBase, StrategyBase
-from backtrader.utils.py3 import with_metaclass
+from backtrader_next.utils.py3 import with_metaclass
 
 
 class MetaObserver(ObserverBase.__class__):

@@ -24,7 +24,7 @@ from collections import OrderedDict
 import itertools
 import sys
 
-import backtrader as bt
+import backtrader_next as bt
 from .utils.py3 import string_types, with_metaclass
 
 

@@ -21,7 +21,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import backtrader as bt
+import backtrader_next as bt
 
 from .import fractal as fractal
 for name in fractal.__all__:

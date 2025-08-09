@@ -24,14 +24,14 @@ from __future__ import (absolute_import, division, print_function,
 
 from datetime import datetime, timedelta, tzinfo
 
-import backtrader as bt
-from backtrader import TimeFrame, date2num, num2date
-from backtrader.feed import DataBase
-from backtrader.metabase import MetaParams
-from backtrader.utils.py3 import (integer_types, queue, string_types,
+import backtrader_next as bt
+from backtrader_next import TimeFrame, date2num, num2date
+from backtrader_next.feed import DataBase
+from backtrader_next.metabase import MetaParams
+from backtrader_next.utils.py3 import (integer_types, queue, string_types,
                                   with_metaclass)
 
-from backtrader.stores import vcstore
+from backtrader_next.stores import vcstore
 
 
 class MetaVCData(DataBase.__class__):
@@ -81,7 +81,7 @@ class VCData(with_metaclass(MetaVCData, DataBase)):
 
       - ``usetimezones`` (default: ``True``)
         For most markets the time offset information provided by *Visual Chart*
-        allows for datetime to be converted to market time (*backtrader* choice
+        allows for datetime to be converted to market time (*backtrader_next* choice
         for representation)
 
         Some markets are special (``096``) and need special internal coverage

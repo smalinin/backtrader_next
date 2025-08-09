@@ -25,8 +25,8 @@ import argparse
 import datetime
 
 # The above could be sent to an independent module
-import backtrader as bt
-from backtrader.utils import flushfile  # win32 quick stdout flushing
+import backtrader_next as bt
+from backtrader_next.utils import flushfile  # win32 quick stdout flushing
 
 StoreCls = bt.stores.OandaStore
 DataCls = bt.feeds.OandaData

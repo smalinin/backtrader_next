@@ -23,8 +23,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import math
 
-import backtrader as bt
-from backtrader import TimeFrameAnalyzerBase
+import backtrader_next as bt
+from backtrader_next import TimeFrameAnalyzerBase
 
 
 class Returns(TimeFrameAnalyzerBase):

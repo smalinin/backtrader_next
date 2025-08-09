@@ -33,10 +33,10 @@ import time
 from ib.ext.Contract import Contract
 import ib.opt as ibopt
 
-from backtrader import TimeFrame, Position
-from backtrader.metabase import MetaParams
-from backtrader.utils.py3 import bytes, bstr, queue, with_metaclass, long
-from backtrader.utils import AutoDict, UTC
+from backtrader_next import TimeFrame, Position
+from backtrader_next.metabase import MetaParams
+from backtrader_next.utils.py3 import bytes, bstr, queue, with_metaclass, long
+from backtrader_next.utils import AutoDict, UTC
 
 bytes = bstr  # py2/3 need for ibpy
 
@@ -152,7 +152,7 @@ class IBStore(with_metaclass(MetaSingleton, object)):
         be used for the price notifications (tickPrice events, for example for
         CASH markets) to modify the locally calculated timestamp.
 
-        The time offset will propagate to other parts of the ``backtrader``
+        The time offset will propagate to other parts of the ``backtrader_next``
         ecosystem like the **resampling** to align resampling timestamps using
         the calculated offset.
 

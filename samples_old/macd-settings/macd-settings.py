@@ -26,7 +26,7 @@ import argparse
 import datetime
 import random
 
-import backtrader as bt
+import backtrader_next as bt
 
 BTVERSION = tuple(int(x) for x in bt.__version__.split('.'))
 

@@ -26,10 +26,10 @@ import datetime
 import math
 
 # The above could be sent to an independent module
-import backtrader as bt
-import backtrader.feeds as btfeeds
-import backtrader.utils.flushfile
-import backtrader.filters as btfilters
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
+import backtrader_next.utils.flushfile
+import backtrader_next.filters as btfilters
 
 from relativevolume import RelativeVolume
 

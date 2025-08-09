@@ -30,10 +30,10 @@ import threading
 import oandapy
 import requests  # oandapy depdendency
 
-import backtrader as bt
-from backtrader.metabase import MetaParams
-from backtrader.utils.py3 import queue, with_metaclass
-from backtrader.utils import AutoDict
+import backtrader_next as bt
+from backtrader_next.metabase import MetaParams
+from backtrader_next.utils.py3 import queue, with_metaclass
+from backtrader_next.utils import AutoDict
 
 
 # Extend the exceptions to support extra cases
@@ -535,7 +535,7 @@ class OandaStore(with_metaclass(MetaSingleton, object)):
                 self.broker._accept(oref)  # taken immediately
 
             for oid in oids:
-                self._ordersrev[oid] = oref  # maps ids to backtrader order
+                self._ordersrev[oid] = oref  # maps ids to backtrader_next order
 
                 # An transaction may have happened and was stored
                 tpending = self._transpend[oid]

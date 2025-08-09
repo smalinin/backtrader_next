@@ -24,7 +24,7 @@ from __future__ import (absolute_import, division, print_function,
 import argparse
 import datetime
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 class NYSE_2016(bt.TradingCalendar):

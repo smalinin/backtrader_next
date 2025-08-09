@@ -37,7 +37,7 @@ import datetime
 from itertools import islice
 import math
 
-from backtrader.errors import BacktraderError
+from backtrader_next.errors import BacktraderError
 
 from .utils.py3 import with_metaclass, string_types
 

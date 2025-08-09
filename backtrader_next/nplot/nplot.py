@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+
 import bisect
 import collections
 import datetime
@@ -12,10 +17,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from backtrader import order
-from backtrader.strategy import Strategy
-from backtrader.analyzers.eq import Eq
-from backtrader.utils.dateintern import format_datetime
+from backtrader_next import order
+from backtrader_next.strategy import Strategy
+from backtrader_next.analyzers.eq import Eq
+from backtrader_next.utils.dateintern import format_datetime
 from bn_lightweight_charts.util import MARKER_POSITION
 
 from ..utils.py3 import with_metaclass

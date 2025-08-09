@@ -29,7 +29,7 @@ import random
 import string
 import sys
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 DATAFORMATS = dict(
@@ -74,7 +74,7 @@ def btrun(pargs=''):
     args = parse_args(pargs)
 
     if args.flush:
-        import backtrader.utils.flushfile
+        import backtrader_next.utils.flushfile
 
     stdstats = not args.nostdstats
 
@@ -558,7 +558,7 @@ def parse_args(pargs=''):
               'kwargs is optional\n'
               '\n'
               'signaltype will be uppercased to match the defintions\n'
-              'fromt the backtrader.signal module\n'
+              'fromt the backtrader_next.signal module\n'
               '\n'
               'If module is omitted then class name will be sought in\n'
               'the built-in signals module. Such as in:\n'

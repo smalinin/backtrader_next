@@ -28,9 +28,9 @@ import time
 import sys
 
 
-import backtrader as bt
-import backtrader.feeds as btfeeds
-import backtrader.indicators as btind
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
+import backtrader_next.indicators as btind
 
 
 class OrderExecutionStrategy(bt.Strategy):

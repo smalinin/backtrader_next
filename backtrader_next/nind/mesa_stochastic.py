@@ -1,7 +1,12 @@
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+
 from typing import Tuple
 import numpy as np
 import numba
-import backtrader as bt
+import backtrader_next as bt
 from .utils import compute_roofing_filter_numba, compute_ssf_numba
 
 __all__ = ['MESAStochastic']

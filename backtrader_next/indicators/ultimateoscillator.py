@@ -22,8 +22,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 
-import backtrader as bt
-from backtrader.indicators import SumN, TrueLow, TrueRange
+import backtrader_next as bt
+from backtrader_next.indicators import SumN, TrueLow, TrueRange
 
 
 class UltimateOscillator(bt.Indicator):

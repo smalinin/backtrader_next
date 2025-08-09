@@ -30,16 +30,16 @@ import uuid
 import ib.ext.Order
 import ib.opt as ibopt
 
-from backtrader.feed import DataBase
-from backtrader import (TimeFrame, num2date, date2num, BrokerBase,
+from backtrader_next.feed import DataBase
+from backtrader_next import (TimeFrame, num2date, date2num, BrokerBase,
                         Order, OrderBase, OrderData)
-from backtrader.utils.py3 import bytes, bstr, with_metaclass, queue, MAXFLOAT
-from backtrader.metabase import MetaParams
-from backtrader.comminfo import CommInfoBase
-from backtrader.position import Position
-from backtrader.stores import ibstore
-from backtrader.utils import AutoDict, AutoOrderedDict
-from backtrader.comminfo import CommInfoBase
+from backtrader_next.utils.py3 import bytes, bstr, with_metaclass, queue, MAXFLOAT
+from backtrader_next.metabase import MetaParams
+from backtrader_next.comminfo import CommInfoBase
+from backtrader_next.position import Position
+from backtrader_next.stores import ibstore
+from backtrader_next.utils import AutoDict, AutoOrderedDict
+from backtrader_next.comminfo import CommInfoBase
 
 bytes = bstr  # py2/3 need for ibpy
 
@@ -77,12 +77,12 @@ class IBOrder(OrderBase, ib.ext.Order.Order):
     ib.ext.Order.Order object, which could be used as follows::
 
       Example: if the 4 order execution types directly supported by
-      ``backtrader`` are not enough, in the case of for example
+      ``backtrader_next`` are not enough, in the case of for example
       *Interactive Brokers* the following could be passed as *kwargs*::
 
         orderType='LIT', lmtPrice=10.0, auxPrice=9.8
 
-      This would override the settings created by ``backtrader`` and
+      This would override the settings created by ``backtrader_next`` and
       generate a ``LIMIT IF TOUCHED`` order with a *touched* price of 9.8
       and a *limit* price of 10.0.
 
@@ -106,7 +106,7 @@ class IBOrder(OrderBase, ib.ext.Order.Order):
         tojoin.append('GoodTillDate: {}'.format(self.m_goodTillDate))
         return '\n'.join(tojoin)
 
-    # Map backtrader order types to the ib specifics
+    # Map backtrader_next order types to the ib specifics
     _IBOrdTypes = {
         None: bytes('MKT'),  # default
         Order.Market: bytes('MKT'),
@@ -241,7 +241,7 @@ class IBBroker(with_metaclass(MetaIBBroker, BrokerBase)):
     '''Broker implementation for Interactive Brokers.
 
     This class maps the orders/positions from Interactive Brokers to the
-    internal API of ``backtrader``.
+    internal API of ``backtrader_next``.
 
     Notes:
 

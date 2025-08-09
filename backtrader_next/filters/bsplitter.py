@@ -23,7 +23,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import datetime
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 class DaySplitter_Close(bt.with_metaclass(bt.MetaParams, object)):

@@ -25,10 +25,10 @@ import argparse
 import datetime
 import random
 
-import backtrader as bt
-import backtrader.feeds as btfeeds
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
 
-from backtrader.utils.py3 import with_metaclass
+from backtrader_next.utils.py3 import with_metaclass
 
 
 class St(bt.Strategy):

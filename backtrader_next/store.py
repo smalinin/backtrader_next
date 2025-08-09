@@ -23,8 +23,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import collections
 
-from backtrader.metabase import MetaParams
-from backtrader.utils.py3 import with_metaclass
+from backtrader_next.metabase import MetaParams
+from backtrader_next.utils.py3 import with_metaclass
 
 
 class MetaSingleton(MetaParams):

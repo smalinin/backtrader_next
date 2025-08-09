@@ -23,7 +23,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import math
 
-import backtrader as bt
+import backtrader_next as bt
 
 
 class OrderObserver(bt.observer.Observer):

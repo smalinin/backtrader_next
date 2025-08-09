@@ -1,8 +1,8 @@
 from pandas import DataFrame
 
-import backtrader as bt
-from backtrader.utils.py3 import items, iteritems
-from backtrader import Order
+import backtrader_next as bt
+from backtrader_next.utils.py3 import items, iteritems
+from backtrader_next import Order
 import numpy as np
 import pandas as pd
 from pandas import DataFrame as df

@@ -1,4 +1,9 @@
-import backtrader as bt
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+
+import backtrader_next as bt
 import numpy as np
 from .utils import compute_sma_numba
 

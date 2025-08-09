@@ -25,8 +25,8 @@ import argparse
 import datetime
 
 # The above could be sent to an independent module
-import backtrader as bt
-import backtrader.feeds as btfeeds
+import backtrader_next as bt
+import backtrader_next.feeds as btfeeds
 
 from relvolbybar import RelativeVolumeByBar
 
