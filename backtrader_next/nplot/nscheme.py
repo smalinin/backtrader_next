@@ -54,8 +54,6 @@ tab10_index = [3, 0, 2, 1, 4, 5, 6, 7, 8, 9]
 
 class PlotScheme(object):
     def __init__(self):
-        # to have a tight packing on the chart wether only the x axis or also
-        # the y axis have (see matplotlib)
         self.ytight = False
 
         # y-margin (top/bottom) for the subcharts. This will not overrule the

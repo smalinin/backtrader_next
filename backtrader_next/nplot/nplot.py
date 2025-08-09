@@ -456,7 +456,7 @@ class Plot(with_metaclass(MetaParams, object)):
         indlabel = ind.plotlabel()
 
         # Scan lines quickly to find out if some lines have to be skipped for
-        # legend (because matplotlib reorders the legend)
+        # legend
         toskip = 0
         for lineidx in range(ind.size()):
             line = ind.lines[lineidx]
