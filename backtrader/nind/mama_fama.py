@@ -111,6 +111,9 @@ def compute_mama_fama_numba(high, low, fast_limit, slow_limit):
 class MAMA_FAMA(bt.Indicator):
     '''
     MESA Adaptive Moving Average (MAMA) and Following Adaptive Moving Average (FAMA)
+    intraday                         fast=0.8  slow=0.1
+    for balance                      fast=0.5  slow=0.05
+    max noise cancel(swing, trends)  fast=0.3  slow=0.01
     '''
     lines = ('mama', 'fama')
     params = (
@@ -120,7 +123,7 @@ class MAMA_FAMA(bt.Indicator):
     plotinfo = dict(subplot=False)
     plotlines = dict(
         mama=dict(ls='-'),
-        fama=dict(ls='--'),
+        fama=dict(ls='-'),
     )
 
     def __init__(self):
