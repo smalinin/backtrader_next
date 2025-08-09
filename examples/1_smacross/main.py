@@ -1,7 +1,6 @@
 import pandas as pd
 import backtrader_next as bt
 from backtrader_next.feeds import PandasData
-import backtrader_next.analyzers as anal
 
 
 class SimpleSizer(bt.Sizer):
