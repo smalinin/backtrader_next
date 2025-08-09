@@ -12,7 +12,7 @@ Live Trading and backtesting platform written in Python.
 
 ## Installation
 ```
-pip install backtrader_next
+pip install backtrader-next
 ```
 ## History
 Package is based on [backtrader](https://github.com/mementum/backtrader)
