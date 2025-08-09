@@ -166,7 +166,7 @@ class Plot(with_metaclass(MetaParams, object)):
             # plot ind above data
             c_up = []
             for ind in self.dplots_up[data]:
-                rc = self.plotind(
+                rc, sub_rc = self.plotind(
                     data,
                     ind,
                     subinds=self.dplots_over[ind],
@@ -174,13 +174,15 @@ class Plot(with_metaclass(MetaParams, object)):
                     downinds=self.dplots_down[ind])
                 if len(rc)>0:
                     c_up.append(rc)
+                if len(sub_rc) > 0:
+                    c_up.extend(sub_rc)
 
             # plot candles and ind on candles
             c_data, c_down = self.plotdata(data, self.dplots_over[data])
 
             #TODO
             for ind in self.dplots_down[data]:
-                rc = self.plotind(
+                rc, sub_rc = self.plotind(
                     data,
                     ind,
                     subinds=self.dplots_over[ind],
@@ -189,6 +191,8 @@ class Plot(with_metaclass(MetaParams, object)):
                     )
                 if len(rc)>0:
                     c_down.append(rc)
+                if (len(sub_rc) > 0):
+                    c_down.extend(sub_rc)
 
             data_name = data._name if data._name else f'data{data._idx}'
             if self.chart is None:
@@ -438,9 +442,11 @@ class Plot(with_metaclass(MetaParams, object)):
 
         # plot subindicators on self with independent axis above
         for upind in upinds:
-            rc = self.plotind(iref, upind)
+            rc, sub_rc = self.plotind(iref, upind)
             # ind_charts.extend(rc)
             ind_charts.append(rc)
+            if len(sub_rc) > 0:
+                ind_charts.extend(sub_rc)
 
         indlabel = ind.plotlabel()
 
@@ -522,16 +528,19 @@ class Plot(with_metaclass(MetaParams, object)):
         # plot subindicators that were created on self
         for subind in subinds:
             # rc = self.plotind(iref, subind, subinds=self.dplots_over[subind], masterax=ax)
-            rc = self.plotind(iref, subind, subinds=self.dplots_over[subind], masterax=masterax)
-            # ind_charts.extend(rc)
-            ind_charts.append(rc)
+            rc, sub_rc = self.plotind(iref, subind, subinds=self.dplots_over[subind], masterax=masterax)
+            ind_charts.extend(rc)
+            if len(sub_rc) > 0:
+                ind_charts.extend(sub_rc)
 
+        sub_down_inds = []
         # plot subindicators on self with independent axis below
         for downind in downinds:
-            rc = self.plotind(iref, downind, masterax=True)
-            # ind_charts.extend(rc)
-            ind_charts.append(rc)
-        return ind_charts
+            rc, sub_rc = self.plotind(iref, downind, masterax=True)
+            sub_down_inds.append(rc)
+            if len(sub_rc) > 0:
+                sub_down_inds.append(sub_rc)
+        return ind_charts, sub_down_inds
 
 
     def plotdata(self, data, indicators):
@@ -593,19 +602,23 @@ class Plot(with_metaclass(MetaParams, object)):
                 }])
 
         for ind in indicators:
-            rc = self.plotind(data, ind, subinds=self.dplots_over[ind], masterax=True)
+            rc, sub_rc = self.plotind(data, ind, subinds=self.dplots_over[ind], masterax=True)
             # chart_data.extend(rc)
             chart_data.append(rc)
+            if len(sub_rc) > 0:
+                chart_data.append(sub_rc)
 
         for ind in indicators:
             downinds = self.dplots_down[ind]
             for downind in downinds:
-                rc = self.plotind(data, downind,
+                rc, sub_rc = self.plotind(data, downind,
                             subinds=self.dplots_over[downind],
                             upinds=self.dplots_up[downind],
                             downinds=self.dplots_down[downind])
                 # charts_down.extend(rc)
                 charts_down.append(rc)
+                if len(sub_rc) > 0:
+                    charts_down.append(sub_rc)
         return chart_data, charts_down
 
 
