@@ -65,6 +65,7 @@ end
 #### Addons
 Also it will create two HTML files  and open it in your current browser.
 - smacross.html  - charts and trade stats  
+
 ![chart1](https://raw.githubusercontent.com/smalinin/backtrader_next/master/examples/1_smacross/scr1.png)
 
 ![chart1](https://raw.githubusercontent.com/smalinin/backtrader_next/master/examples/1_smacross/scr2.png?raw=true)
@@ -72,4 +73,5 @@ Also it will create two HTML files  and open it in your current browser.
 ![chart1](https://raw.githubusercontent.com/smalinin/backtrader_next/master/examples/1_smacross/scr3.png)
 
 - smacross_stats.html - quantstats like strategy report
+
 ![chart1](https://raw.githubusercontent.com/smalinin/backtrader_next/master/examples/1_smacross/scr4.png)
