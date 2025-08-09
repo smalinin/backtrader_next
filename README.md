@@ -30,7 +30,7 @@ Note:
   - The `next()` method in strategies has been changed to `next(self, status=None)`, related to futures support.
 
 ## Here a snippet of a Simple Moving Average CrossOver.
-```
+```python
 import pandas as pd
 import backtrader_next as bt
 from backtrader_next.feeds import PandasData
