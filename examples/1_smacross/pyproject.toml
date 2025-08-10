@@ -8,6 +8,3 @@ dependencies = [
     "backtrader-next",
 ]
 
-[tool.uv.sources]
-backtrader-next = { path = "../../" }
-
