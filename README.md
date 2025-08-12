@@ -26,6 +26,8 @@ Changes:
  - Improved support for switching between futures (for testing, etc.).
  - Added new indicators implemented with Numba.
  - Improved performance — now it runs about 2–3× slower than Backtesting.py in `runonce=True` mode with `PandasData`.
+ - Detailed results
+ - Interactive visualizations
 
 Note:
   - The `next()` method in strategies has been changed to `next(self, status=None)`, related to futures support.
