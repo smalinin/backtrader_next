@@ -3,6 +3,7 @@
 # backtrader-next
 
 [![PyPi Release](https://img.shields.io/pypi/v/backtrader_next?color=32a852&label=PyPi)](https://pypi.org/project/backtrader_next/)
+[![Total downloads](https://img.shields.io/pepy/dt/backtrader_next?label=%E2%88%91&color=skyblue)](https://pypistats.org/packages/backtrader_next)
 [![Made with Python](https://img.shields.io/badge/Python-3.8+-c7a002?logo=python&logoColor=white)](https://python.org "Go to Python homepage")
 [![License](https://img.shields.io/github/license/smalinin/backtrader_next?color=9c2400)](https://github.com/smalinin/backtrader_next/blob/master/LICENSE)
 
