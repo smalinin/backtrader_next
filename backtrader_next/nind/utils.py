@@ -78,7 +78,7 @@ def compute_roofing_filter_numba(series, lp_period, hp_period):
     # Ehlers Roofing Filter:
     # 1. High-pass filter
     # 2. SuperSmoother filter on the result of the high-pass
-    hp = compute_highpass1_numba(series, hp_period)
+    hp = compute_highpass2_numba(series, hp_period)
 
     # Then apply SuperSmoother to HP result (low-pass)
     roof = compute_ssf_numba(hp, lp_period)
