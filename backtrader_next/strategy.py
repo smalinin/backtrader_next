@@ -164,9 +164,16 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         '''
         desc = pd.Series(dtype=object)
         desc.loc["Strategy"] = self.__class__.__name__
-        for key, val in self.params._getitems():
-            desc.loc[key]=val
+        for key, val in self.p._getitems():
+            desc.loc[key]= self.p._get(key)
         return desc
+
+    @property
+    def statistics(self) -> pd.Series:
+        eq = self.analyzers.getbyname('eq')
+        stats = eq.compute_stats()
+        desc = self.get_description()
+        return pd.concat([desc, stats])
 
     def _periodset(self):
         dataids = [id(data) for data in self.datas]

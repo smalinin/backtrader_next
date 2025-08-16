@@ -24,6 +24,7 @@ import datetime
 import collections
 import itertools
 import multiprocessing
+import sys
 import pandas as pd
 
 try:  # For new Python versions
@@ -46,7 +47,7 @@ from .strategy import Strategy, SignalStrategy
 from .tradingcal import (TradingCalendarBase, TradingCalendar, PandasMarketCalendar)
 from .timer import Timer
 from . import nplot
-from .nplot.utils import tmpfilename
+from .nplot.utils import tmpfilename, gen_timestamp
 
 # Defined here to make it pickable. Ideally it could be defined inside Cerebro
 
@@ -995,26 +996,26 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
         if filename is None:
-            with tmpfilename() as fname:
-                plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                            width=width, height=height, show=show, filename=fname)
-        else:
-                plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                            width=width, height=height, show=show, filename=filename)
+            filename = f"strat_charts_{gen_timestamp()}.html"
+        iplot = False
+        if 'ipykernel' in sys.modules:
+            iplot = True
+        plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
+                        width=width, height=height, show=show, filename=filename)
 
+    @property
     def statistics(self) -> pd.Series:
         flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
         if len(flat_runstrats) == 0:
             return pd.DataFrame.empty()
-        eq = flat_runstrats[0].analyzers.getbyname('eq')
-        stats = eq.compute_stats()
         if len(flat_runstrats) > 1:
             desc = pd.Series(dtype=object)
             desc.loc["Strategy"] = "Multiple Strategies"
+            eq = flat_runstrats[0].analyzers.getbyname('eq')
+            stats = eq.compute_stats()
             return pd.concat([desc, stats])
         else:
-            desc = flat_runstrats[0].get_description()
-            return pd.concat([desc, stats])
+            return flat_runstrats[0].statistics
 
 
     def show_report(self, name=None, filename=None, show=True):
@@ -1030,8 +1031,15 @@ class Cerebro(with_metaclass(MetaParams, object)):
             for s in flat_runstrats:
                 sname.append(s.__class__.__name__)
             name = f"Statistics {' '.join(sname)} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        if filename is None:
+            filename = f"strat_quantstats_{gen_timestamp()}.html"
+        iplot = False
+        if 'ipykernel' in sys.modules:
+            iplot = True
+
         report_gen = nplot.Statistics()
-        report_gen.report(name=name, performance=eq, show=show, filename=filename)
+        report_gen.report(name=name, performance=eq, show=show, filename=filename, iplot=iplot)
+
 
     def __call__(self, iterstrat):
         '''
@@ -1350,8 +1358,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
                     for attrname in dir(a):
                         if attrname.startswith('data'):
                             setattr(a, attrname, None)
-
-                oreturn = OptReturn(strat.params, analyzers=strat.analyzers, strategycls=type(strat))
+                oreturn = OptReturn(strat.params, analyzers=strat.analyzers, statistics=strat.statistics, strategycls=type(strat))
                 results.append(oreturn)
 
             return results

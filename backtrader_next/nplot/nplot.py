@@ -7,28 +7,23 @@ import bisect
 import collections
 import datetime
 from hashlib import file_digest
-import sys
-import time
-from tkinter import N
 import webbrowser
-import os
 from pathlib import Path
 
 import pandas as pd
 import numpy as np
 
-from backtrader_next import order
+# from backtrader_next import order
 from backtrader_next.strategy import Strategy
 from backtrader_next.analyzers.eq import Eq
 from backtrader_next.utils.dateintern import format_datetime
-from bn_lightweight_charts.util import MARKER_POSITION
 
 from ..utils.py3 import with_metaclass
 from ..utils.date import format_datetime
 from .. import AutoInfoClass, MetaParams, TimeFrame, date2num, num2date
 from .nscheme import PlotScheme
 
-from bn_lightweight_charts.widgets import HTMLChart_BN, JupyterChart
+from bn_lightweight_charts.widgets import HTMLChart_BN
 
 #TODO add plot observers
 
@@ -74,18 +69,20 @@ class Plot(with_metaclass(MetaParams, object)):
             if not isinstance(strategy, Strategy):
                 raise TypeError(f"Expected Strategy instance, got {type(strategy)}")
             else:
-                self.plot_one(strategy, iplot=iplot,
+                self.plot_one(strategy,
                             start=start, end=end, width=width, height=height,
                             show_eq=show_eq, filename=filename, **kwargs)
         if self.chart:
             self.chart.load()
-            if not iplot and show:
-                app_root = Path(sys.argv[0]).resolve().parent
-                html_code = os.path.join(app_root, filename)
-                webbrowser.open(html_code)
+        file_path = Path(filename).resolve().as_uri()
+        if iplot:
+            print(f"Opening charts in browser: {file_path}")
+            webbrowser.open(file_path)
+        elif show:
+            webbrowser.open(file_path)
 
 
-    def plot_one(self, strategy, iplot=False,
+    def plot_one(self, strategy,
             start=None, end=None, width=None, height=None,
             show_eq=False, filename=None, **kwargs):
 
@@ -201,7 +198,7 @@ class Plot(with_metaclass(MetaParams, object)):
 
             data_name = data._name if data._name else f'data{data._idx}'
             if self.chart is None:
-                self.chart = self.create_chart(c_top, iplot=iplot, filename=filename)
+                self.chart = self.create_chart(c_top, filename=filename)
 
             self.show(self.chart, xdates, c_top, c_up, c_data, c_down, strat_name, data_name)
         return None
@@ -251,13 +248,9 @@ class Plot(with_metaclass(MetaParams, object)):
                 size += o_size
         return trades_lst
 
-    def create_chart(self, c_top, filename, iplot=False):
-        if iplot:
-            chart = JupyterChart(width=1000, height=800,
-                                inner_height=-300 if c_top else -500)
-        else:
-            chart = HTMLChart_BN(width=1000, height=800,
-                            inner_height=-300 if c_top else -500, filename=filename)
+    def create_chart(self, c_top, filename):
+        chart = HTMLChart_BN(width=1600, height=900,
+                        inner_height=-300 if c_top else -500, filename=filename)
         chart.legend(visible=True)
         chart.price_scale(perm_width=100)
         chart.fit()
@@ -532,7 +525,6 @@ class Plot(with_metaclass(MetaParams, object)):
 
         # plot subindicators that were created on self
         for subind in subinds:
-            # rc = self.plotind(iref, subind, subinds=self.dplots_over[subind], masterax=ax)
             rc, sub_rc = self.plotind(iref, subind, subinds=self.dplots_over[subind], masterax=masterax)
             ind_charts.extend(rc)
             if len(sub_rc) > 0:

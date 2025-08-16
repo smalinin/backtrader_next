@@ -6,7 +6,7 @@
 import sys
 from contextlib import contextmanager
 from tempfile import NamedTemporaryFile, gettempdir
-
+from datetime import datetime
 
 @contextmanager
 def tmpfilename():
@@ -14,3 +14,8 @@ def tmpfilename():
         if sys.platform.startswith('win'):
             f.close()
         yield f.name
+
+def gen_timestamp():
+    now = datetime.now()
+    return now.strftime('%Y_%m_%d_%H_%M_%S_%f')
+

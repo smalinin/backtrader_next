@@ -9,17 +9,14 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
 import webbrowser
-import os
-import sys
 from pathlib import Path
-from .utils import tmpfilename
 
 
 class Statistics(object):
     graphs = []
     tables = []
 
-    def report(self, name="Statistics", performance=None, show=True, filename=None):
+    def report(self, name="Statistics", performance=None, show=True, filename="strat_quantstats.html", iplot=False):
         """Prepare statistics for the report"""
         if performance is None:
             exception = "No performance data provided"
@@ -294,19 +291,14 @@ class Statistics(object):
 </body>
 </html>
 """
-        if filename is None:
-            with tmpfilename() as fname:
-                with open(fname, "w", encoding="utf-8") as f:
-                    f.write(full_html)
-                if show:
-                    webbrowser.open(fname)
-        else:
-            app_root = Path(sys.argv[0]).resolve().parent
-            full_fname = os.path.join(app_root, filename)
-            with open(full_fname, "w", encoding="utf-8") as f:
-                    f.write(full_html)
-            if show:
-                webbrowser.open(full_fname)
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(full_html)
+        file_path = Path(filename).resolve().as_uri()
+        if iplot:
+            print(f"Opening report in browser: {file_path}")
+            webbrowser.open(file_path)
+        elif show:
+            webbrowser.open(file_path)
 
 
 #### Figure Creation
