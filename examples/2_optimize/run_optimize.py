@@ -86,7 +86,7 @@ cerebro.optstrategy(
     )
 
 start = time.perf_counter()
-results = cerebro.run(maxcpus=1)
+results = cerebro.run()
 end = time.perf_counter()
 print(f"==Opt time : {end - start:.4f} seconds==")
 
