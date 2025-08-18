@@ -20,9 +20,11 @@
 ###############################################################################
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 
+from tqdm import tqdm
 import datetime
 import collections
 import itertools
+import math
 import multiprocessing
 import sys
 import pandas as pd
@@ -644,7 +646,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(msg, \*args, \*\*kwargs)
+          - callback(msg, *args, **kwargs)
 
         The actual ``msg``, ``*args`` and ``**kwargs`` received are
         implementation defined (depend entirely on the *data/broker/store*) but
@@ -686,7 +688,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(data, status, \*args, \*\*kwargs)
+          - callback(data, status, *args, **kwargs)
 
         The actual ``*args`` and ``**kwargs`` received are implementation
         defined (depend entirely on the *data/broker/store*) but in general one
@@ -863,7 +865,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         self._dooptimize = True
         args = self.iterize(args)
-        optargs = itertools.product(*args)
+        optargs = list(itertools.product(*args))
 
         optkeys = list(kwargs)
 
@@ -872,9 +874,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         okwargs1 = map(zip, itertools.repeat(optkeys), optvals)
 
-        optkwargs = map(dict, okwargs1)
+        optkwargs = list(map(dict, okwargs1))
 
-        it = itertools.product([strategy], optargs, optkwargs)
+        it = list(itertools.product([strategy], optargs, optkwargs))
         self.strats.append(it)
 
     def addstrategy(self, strategy, *args, **kwargs):
@@ -957,12 +959,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 rfig = plotter.plot(strat, figid=si * 100,
                                     numfigs=numfigs, iplot=iplot,
                                     start=start, end=end, use=use)
-                # pfillers=pfillers2)
-
                 figs.append(rfig)
-
             plotter.show()
-
         return figs
 
     def plot(self, iplot=False, start=None, end=None,
@@ -1166,6 +1164,13 @@ class Cerebro(with_metaclass(MetaParams, object)):
             self.addstrategy(Strategy)
 
         iterstrats = itertools.product(*self.strats)
+        progress = None
+        strats_total = 0
+        if self._dooptimize:
+            strats_total=[len(lst) for lst in self.strats]
+            strats_total = math.prod(strats_total)
+            progress = tqdm(total=strats_total, desc="Optimization...")
+            
         if not self._dooptimize or self.p.maxcpus == 1:
             # If no optimmization is wished ... or 1 core is to be used
             # let's skip process "spawning"
@@ -1173,6 +1178,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 runstrat = self.runstrategies(iterstrat)
                 self.runstrats.append(runstrat)
                 if self._dooptimize:
+                    if progress is not None:
+                        progress.update(1)
                     for cb in self.optcbs:
                         cb(runstrat)  # callback receives finished strategy
         else:
@@ -1185,17 +1192,22 @@ class Cerebro(with_metaclass(MetaParams, object)):
                     if self._dopreload:
                         data.preload()
 
-            pool = multiprocessing.Pool(self.p.maxcpus or None)
-            for r in pool.imap(self, iterstrats):
-                self.runstrats.append(r)
-                for cb in self.optcbs:
-                    cb(r)  # callback receives finished strategy
-
-            pool.close()
+            with multiprocessing.Pool(self.p.maxcpus or None) as pool:
+                for r in pool.imap(self, iterstrats):
+                    self.runstrats.append(r)
+                    if progress is not None:
+                        progress.update(1)
+                    for cb in self.optcbs:
+                        cb(r)  # callback receives finished strategy
+                pool.close()
+                pool.join()
 
             if self.p.optdatas and self._dopreload and self._dorunonce:
                 for data in self.datas:
                     data.stop()
+
+        if progress is not None:
+            progress.close()
 
         if not self._dooptimize:
             # avoid a list of list for regular cases

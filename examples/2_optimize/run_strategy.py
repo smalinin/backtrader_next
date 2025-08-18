@@ -65,39 +65,41 @@ class SmaCross(bt.Strategy):
             return False
 
 
-cerebro = bt.Cerebro()
-cerebro.broker.setcash(1_000_000.0)
-cerebro.broker.set_shortcash(False)
-cerebro.broker.setcommission(commission=0, margin=1, mult=1)
-cerebro.addsizer(SimpleSizer, percents=90)
+if __name__ == '__main__':
 
-df = pd.read_csv(f"MSFT_1d.csv.zip", sep=";")
-df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
-df.set_index('Datetime', inplace=True)
+    cerebro = bt.Cerebro()
+    cerebro.broker.setcash(1_000_000.0)
+    cerebro.broker.set_shortcash(False)
+    cerebro.broker.setcommission(commission=0, margin=1, mult=1)
+    cerebro.addsizer(SimpleSizer, percents=90)
 
-data = PandasData(dataframe=df, timeframe=bt.TimeFrame.Days, compression=1)
-cerebro.adddata(data, name='MSFT')
+    df = pd.read_csv(f"MSFT_1d.csv.zip", sep=";")
+    df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
+    df.set_index('Datetime', inplace=True)
+
+    data = PandasData(dataframe=df, timeframe=bt.TimeFrame.Days, compression=1)
+    cerebro.adddata(data, name='MSFT')
 
 
-cerebro = bt.Cerebro()
-cerebro.broker.setcash(1_000_000.0)
-cerebro.broker.set_shortcash(False)
-cerebro.broker.setcommission(commission=0, margin=1, mult=1)
-cerebro.addsizer(SimpleSizer, percents=90)
+    cerebro = bt.Cerebro()
+    cerebro.broker.setcash(1_000_000.0)
+    cerebro.broker.set_shortcash(False)
+    cerebro.broker.setcommission(commission=0, margin=1, mult=1)
+    cerebro.addsizer(SimpleSizer, percents=90)
 
-df = pd.read_csv(f"MSFT_1d.csv.zip", sep=";")
-df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
-df.set_index('Datetime', inplace=True)
+    df = pd.read_csv(f"MSFT_1d.csv.zip", sep=";")
+    df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
+    df.set_index('Datetime', inplace=True)
 
-data = PandasData(dataframe=df, timeframe=bt.TimeFrame.Days, compression=1)
-cerebro.adddata(data, name='MSFT')
+    data = PandasData(dataframe=df, timeframe=bt.TimeFrame.Days, compression=1)
+    cerebro.adddata(data, name='MSFT')
 
-cerebro.addstrategy(SmaCross, MA1=35, MA2=65) # use optimized parameters
+    cerebro.addstrategy(SmaCross, MA1=35, MA2=65) # use optimized parameters
 
-cerebro.run()
+    cerebro.run()
 
-print(cerebro.statistics)
+    print(cerebro.statistics)
 
-cerebro.plot(filename="smacross.html")
-cerebro.show_report(filename="smacross_stats.html")
+    cerebro.plot(filename="smacross.html")
+    cerebro.show_report(filename="smacross_stats.html")
 
