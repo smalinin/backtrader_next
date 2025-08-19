@@ -85,7 +85,7 @@ if __name__ == '__main__':
     results = cerebro.run()
     print(f'\nFinal Portfolio Value: {cerebro.broker.getvalue():.2f}\n')
 
-    rc = cerebro.statistics()
+    rc = cerebro.statistics
     print(rc)
 
     # old plot required matplotlib
