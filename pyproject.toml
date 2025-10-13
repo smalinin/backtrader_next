@@ -1,6 +1,6 @@
 [project]
 name = "backtrader_next"
-version = "0.1.4"
+version = "0.2.0"
 description = "Live Trading and backtesting platform in Python"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
@@ -14,7 +14,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "bn-lightweight-charts>=0.2.1",
     "numba>=0.61.2",

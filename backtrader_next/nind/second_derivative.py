@@ -32,7 +32,7 @@ class SecondDerivative(bt.Indicator):
         # The formula needs access to `close[-2]`, so the min period is 3
         self.addminperiod(3)
 
-    def next(self, status):
+    def next(self):
         self.lines.sd[0] = self.data[0] - 2 * self.data[-1] + self.data[-2]
 
     def once(self, start, end):

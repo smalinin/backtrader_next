@@ -44,7 +44,7 @@ class SmaCross(bt.Strategy):
 
 
 
-    def next(self, status=None):
+    def next(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()

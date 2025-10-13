@@ -34,7 +34,7 @@ class Momentum(bt.Indicator):
         '''Initialize the indicator'''
         self.addminperiod(self.p.period)
 
-    def next(self, status):
+    def next(self):
         self.lines.momentum[0] = self.data[0] - self.data[-self.p.period]
 
     def once(self, start, end):

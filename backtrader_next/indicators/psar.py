@@ -80,13 +80,13 @@ class ParabolicSAR(PeriodN):
         elif len(self) == 2:
             self.nextstart()  # kickstart calculation
         else:
-            self.next(None)  # regular calc
+            self.next()  # regular calc
 
         self.lines.psar[0] = float('NaN')  # no return yet still prenext
 
     def nextstart(self):
         if self._status:  # some states have been calculated
-            self.next(None)  # delegate
+            self.next()  # delegate
             return
 
         # Prepare a status holding array, for current and previous lengths
@@ -114,9 +114,9 @@ class ParabolicSAR(PeriodN):
 
         # With the fake prev trend in place and a sar which will be invalidated
         # go to next to get the calculation done
-        self.next(None)
+        self.next()
 
-    def next(self, status):
+    def next(self):
         hi = self.data.high[0]
         lo = self.data.low[0]
 

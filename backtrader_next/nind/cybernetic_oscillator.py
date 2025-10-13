@@ -35,7 +35,7 @@ class CyberneticOscillator(bt.Indicator):
         self.addminperiod(100)
         #self.min_size = 100 + min_period * 10
         
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(), dtype=np.float64)
 
         co = compute_cybernetic_oscillator_numba(series, self.p.hp_period, self.p.lp_period, 100)

@@ -68,7 +68,7 @@ class CorrelationTrend(bt.Indicator):
         self.addminperiod(self.p.length)
 
 
-    def next(self, status):
+    def next(self):
         if len(self.data) < self.p.length:
             return
         

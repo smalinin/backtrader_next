@@ -109,7 +109,7 @@ class UltimateChannel(bt.Indicator):
         self.addminperiod(max(self.p.str_length, self.p.length, 3))
         self.min_size = max(self.p.str_length, self.p.length, 3) * 20
 
-    def next(self, status):
+    def next(self):
         closes = np.asarray(self.data.close.get_array(self.min_size), dtype=np.float64)
 
         highs = np.asarray(self.data.high.get_array(self.min_size), dtype=np.float64)

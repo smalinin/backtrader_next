@@ -96,7 +96,7 @@ class MESAStochastic(bt.Indicator):
         self.min_size = self.p.hp_period * 20 
         
 
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
 
         mesa = compute_mesa_stochastic_numba(series, self.p.period,

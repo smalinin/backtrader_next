@@ -1615,7 +1615,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 break  # no data delivers anything
 
             for i, dti in enumerate(dts):
-                if dti <= dt0:
+                if datas[i].is_on and dti <= dt0:
                     datas[i].advance()
 
             # Timers before broker (cheat)
@@ -1643,8 +1643,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 next_writers(runstrats)
 
             for i, d in enumerate(datas):
-                if dts[i] <= dt0:
+                if d.is_on and dts[i] <= dt0:
                     dts[i] = d.advance_peek()
+
 
     def _check_timers(self, runstrats, dt0, cheat=False):
         timers = self._timers if not cheat else self._timerscheat

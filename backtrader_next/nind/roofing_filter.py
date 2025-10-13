@@ -32,7 +32,7 @@ class RoofingFilter(bt.Indicator):
         self.min_size = self.p.hp_period * 5 + 3
         
 
-    def next(self, status):
+    def next(self):
         if len(self.data) < 3:
             return
 

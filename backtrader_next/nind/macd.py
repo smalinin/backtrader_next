@@ -47,7 +47,7 @@ class MACD(bt.Indicator):
         self.min_size = max(self.p.fast_period, self.p.slow_period, self.p.signal_period) * 20 
 
 
-    def next(self, status):
+    def next(self):
         closes = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
         macd, signal, hist = compute_macd_numba(
             closes,

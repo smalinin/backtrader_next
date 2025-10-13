@@ -38,7 +38,7 @@ class UltimateSmoother(bt.Indicator):
         self.addminperiod(3)
         self.min_size = self.p.period * 20
         
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
 
         smoothed = compute_ultimate_smoother_numba(series, self.p.period)

@@ -42,7 +42,7 @@ class LaguerreFilter(bt.Indicator):
         self.addminperiod(self.p.length)
         self.min_size = self.p.length * 20
         
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
 
         laguerre, usmoother = compute_laguerre_filter_numba(series, self.p.gama, self.p.length)

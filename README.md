@@ -29,9 +29,6 @@ Changes:
  - Detailed results
  - Interactive visualizations
 
-Note:
-  - The `next()` method in strategies has been changed to `next(self, status=None)`, related to futures support.
-
 ## Here a snippet of a Simple Moving Average CrossOver.
 ```python
 import pandas as pd
@@ -74,7 +71,7 @@ class SmaCross(bt.Strategy):
 
 
 
-    def next(self, status=None):
+    def next(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()
@@ -267,7 +264,7 @@ From source:
 Version numbering
 =================
 
-X.Y.Z.I
+X.Y.Z
 
   - X: Major version number. Should stay stable unless something big is changed
     like an overhaul to use ``numpy``
@@ -275,4 +272,3 @@ X.Y.Z.I
     (god forbids) an incompatible API change.
   - Z: Revision version number. To be changed for documentation updates, small
     changes, small bug fixes
-  - I: Number of Indicators already built into the platform

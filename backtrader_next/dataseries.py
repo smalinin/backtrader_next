@@ -63,10 +63,24 @@ class DataSeries(LineSeries):
     _name = ''
     _compression = 1
     _timeframe = TimeFrame.Days
+    _is_on = True
 
     Close, Low, High, Open, Volume, OpenInterest, DateTime = range(7)
 
     LineOrder = [DateTime, Open, High, Low, Close, Volume, OpenInterest]
+
+    @property
+    def is_on(self) -> bool:
+        return self._is_on
+
+    @is_on.setter
+    def is_on(self, value: bool):
+        self._is_on = value
+
+    @property
+    def name(self):
+        return self._name
+
 
     def getwriterheaders(self):
         headers = [self._name, 'len']

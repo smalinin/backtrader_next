@@ -65,7 +65,7 @@ class TruncBandPass(bt.Indicator):
         self.trunc_buf = [0.0] * 101
         self.min_size = min_period * 5
 
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(self.min_size), dtype=np.float64)
         TBP = compute_trunc_bandpass_numba(
                 series, self.p.period, self.p.bandwidth, self.p.length)

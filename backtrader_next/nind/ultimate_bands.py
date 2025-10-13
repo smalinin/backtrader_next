@@ -97,7 +97,7 @@ class UltimateBands(bt.Indicator):
         self.addminperiod(max(self.p.length, 3))
         self.min_size = max(self.p.length, 3) * 20
 
-    def next(self, status):
+    def next(self):
         """
         Calculate Ultimate Bands values for real-time data (bar by bar)
         """

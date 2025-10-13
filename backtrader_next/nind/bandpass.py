@@ -44,7 +44,7 @@ class BandPass(bt.Indicator):
         self.addminperiod(self.p.period + 2)  # Minimum required bars
 
         
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(), dtype=np.float64)
 
         BP = compute_bandpass_numba(

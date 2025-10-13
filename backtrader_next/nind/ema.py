@@ -30,7 +30,7 @@ class EMA(bt.Indicator):
         self.alpha = 2.0 / (self.p.period + 1)
         self.min_size = self.p.period * 5
 
-    def next(self, status):
+    def next(self):
         price = self.data[0]
         if len(self.data) == self.p.period:
             closes = self.data.get(size=self.p.period)

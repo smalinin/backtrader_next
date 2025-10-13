@@ -82,7 +82,7 @@ class HurstExponent(PeriodN):
         self.lags = asarray(range(lag_start, lag_end))
         self.log10lags = log10(self.lags)
 
-    def next(self, status):
+    def next(self):
         # Fetch the data
         ts = asarray(self.data.get(size=self.p.period))
 

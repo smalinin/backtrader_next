@@ -78,7 +78,7 @@ class CorrelationTrendSS(bt.Indicator):
         self.addminperiod(min_period)
         self.min_size = min_period * 10
 
-    def next(self, status):
+    def next(self):
         if len(self.data) < self.p.length:
             return
         

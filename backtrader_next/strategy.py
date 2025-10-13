@@ -293,16 +293,22 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self._minperstatus = minperstatus = max(dlens)
         return minperstatus, dlens
 
-    def _getminperstatus_once(self, dt, dts=None):
+    def _getminperstatus_once(self, dt0, dts=None):
         # check the min period status connected to datas
         _datas = self.datas
         if dts is None:
-            dlens = list(map(operator.sub, self._minperiods, map(len, self.datas)))
-        else:
+            # Standard calculation: minperiod - current data length
+            # Only count active data feeds (is_on=True)
             dlens = [
-                    self._minperiods[i] - len(self.datas[i]) if dt >= dts[i] else self._minperiods[i]
-                        for i in range(len(self.datas))
-                    ]
+                self._minperiods[i] - len(_datas[i]) if _datas[i].is_on else self._minperiods[i]
+                for i in range(len(_datas))
+            ]
+        else:
+            # Filter by datetime and is_on flag: only count data if active and started
+            dlens = [
+                self._minperiods[i] - len(_datas[i]) if (_datas[i].is_on and dt0 >= dts[i]) else self._minperiods[i]
+                for i in range(len(_datas))
+            ]
         self._minperstatus = minperstatus = max(dlens)
         return minperstatus, dlens
 
@@ -324,23 +330,30 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         else:
             self.prenext_open()
 
-    def _oncepost(self, dt, dts=None):
+    def _oncepost(self, dt0, dts=None):
+        # Advance indicators whose owners are active
         for indicator in self._ind_iterator:
-            # if len(indicator._clock) > len(indicator):  ##?? duplicated it is checked already in indicator.advance()
-            indicator.advance()
+            owner = indicator._owner
+            # Fast check: if owner is DataSeries (data feed), check is_on flag
+            # For non-DataSeries owners (indicators, etc.), always advance
+            if owner is not None and (not isinstance(owner, bt.DataSeries) or owner.is_on):
+                indicator.advance()
 
-        # strategy has been reset to beginning. advance step by step
+        # Strategy has been reset to beginning. Advance step by step
         self.forward()
 
-        self.lines.datetime[0] = dt
+        self.lines.datetime[0] = dt0
         self._notify()
 
-        minperstatus, dlens = self._getminperstatus_once(dt, dts) ## Get the minimum period status and data lengths
-        ##---fixed---##
+        # Get the minimum period status and data lengths
+        minperstatus, dlens = self._getminperstatus_once(dt0, dts)
+        
+        # Call appropriate next method based on minimum period status
+        # any_status check is redundant since minperstatus = max(dlens)
+        # but kept for multi-data edge cases where individual data may be ready
         any_status = any(x < 0 for x in dlens)
         if minperstatus < 0 or any_status:
-        # if minperstatus < 0:
-            self.next(dlens)
+            self.next()
         elif minperstatus == 0:
             self.nextstart()  # only called for the 1st value
         else:

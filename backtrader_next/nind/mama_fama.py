@@ -137,7 +137,7 @@ class MAMA_FAMA(bt.Indicator):
         self.slow_limit = self.p.slow_limit
         self.min_size = round((2/self.p.slow_limit - 1) * 20)
 
-    def next(self, status):
+    def next(self):
         highs = np.asarray(self.data.high.get_array(self.min_size), dtype=np.float64)
         lows = np.asarray(self.data.low.get_array(self.min_size), dtype=np.float64)
 

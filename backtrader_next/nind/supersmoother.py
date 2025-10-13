@@ -37,7 +37,7 @@ class SuperSmoother(bt.Indicator):
         self.c3 = -a1 * a1
         self.c1 = 1 - self.c2 - self.c3
 
-    def next(self, status):
+    def next(self):
         if len(self) < 2:
             self.lines.ssf[0] = self.data[0]
         else:

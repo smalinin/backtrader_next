@@ -31,7 +31,7 @@ class ROC(bt.Indicator):
     def __init__(self):
         self.addminperiod(self.p.period)
 
-    def next(self, status):
+    def next(self):
         self.lines.roc[0] = (self.data[0] - self.data[-self.p.period]) / self.data[-self.p.period]
 
     def once(self, start, end):

@@ -277,7 +277,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
             ##---fixed---##
             any_status = any(x < 0 for x in dlens)
             if minperstatus < 0 or any_status:
-                self.next(dlens)
+                self.next()
             elif minperstatus == 0:
                 self.nextstart()  # only called for the 1st value
             else:
@@ -286,7 +286,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
             # assume indicators and others operate on same length datas
             # although the above operation can be generalized
             if clock_len > self._minperiod:
-                self.next(None)
+                self.next()
             elif clock_len == self._minperiod:
                 self.nextstart()  # only called for the 1st value
             elif clock_len:

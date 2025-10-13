@@ -20,7 +20,7 @@ class SMA(bt.Indicator):
     def __init__(self):
         self.addminperiod(self.p.period)
 
-    def next(self, status):
+    def next(self):
         series = np.asarray(self.data.get_array(self.p.period), dtype=np.float64)
         if len(series) >= self.p.period:
             series = series[-self.p.period:]
