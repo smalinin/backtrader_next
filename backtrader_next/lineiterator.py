@@ -353,9 +353,9 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
         '''
 
         # Called once for 1st full calculation - defaults to regular next
-        self.next(None)
+        self.next()
 
-    def next(self, status=None):
+    def next(self):
         '''
         This method will be called for all remaining data points when the
         minimum period for all datas/indicators have been meet.
