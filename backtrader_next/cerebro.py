@@ -28,6 +28,7 @@ import math
 import multiprocessing
 import sys
 import pandas as pd
+import math
 
 try:  # For new Python versions
     collectionsAbc = collections.abc  # collections.Iterable -> collections.abc.Iterable
@@ -1608,14 +1609,15 @@ class Cerebro(with_metaclass(MetaParams, object)):
         cheat_on_open = self.p.cheat_on_open
 
         dts = [d.advance_peek() for d in datas]
+        ndatas = len(datas)
         while True:
             # Check next incoming date in the datas
             dt0 = min(dts)
-            if dt0 == float('inf'):
+            if dt0 == math.inf:
                 break  # no data delivers anything
 
-            for i, dti in enumerate(dts):
-                if datas[i].is_on and dti <= dt0:
+            for i in range(ndatas):
+                if datas[i].is_on and dts[i] <= dt0:
                     datas[i].advance()
 
             # Timers before broker (cheat)
@@ -1636,15 +1638,15 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
             # Strategy once-post and writer updates
             for strat in runstrats:
-                strat._oncepost(dt0, dts)
+                strat._oncepost(dt0, dts)  ##//?? <<<----
                 if self._event_stop:  # stop if requested
                     return
 
                 next_writers(runstrats)
 
-            for i, d in enumerate(datas):
-                if d.is_on and dts[i] <= dt0:
-                    dts[i] = d.advance_peek()
+            for i in range(ndatas):
+                if datas[i].is_on and dts[i] <= dt0:
+                    dts[i] = datas[i].advance_peek()
 
 
     def _check_timers(self, runstrats, dt0, cheat=False):

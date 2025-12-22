@@ -200,11 +200,6 @@ class LineBuffer(LineSingle):
         return len(self.array) - self.extension
 
     def __getitem__(self, ago):
-        #pos = self._idx+ago      #??TODO
-        #if se<0:
-        #    raise BacktraderError(f'array index {pos} out of bounds')
-        #if self._idx>=0 and ago>1:
-        #    raise BacktraderError(f'Could not get data from future')
         return self.array[self._idx + ago]
 
     def get(self, ago=0, size=1):
