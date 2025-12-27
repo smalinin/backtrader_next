@@ -282,7 +282,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 if ind['mode']=='candle':
                     v_data = ind['data']
                     v_data['time'] = xdates
-                    chart.set(pd.DataFrame(v_data))
+                    chart.set_zipped(pd.DataFrame(v_data))
                 elif ind['mode']=='bar':
                     i_ls = ind.get('ls', None)
                     i_style = 'dashed' if i_ls=='--' else 'solid'
@@ -295,7 +295,7 @@ class Plot(with_metaclass(MetaParams, object)):
                     v_data = ind['data']
                     line = chart.create_histogram(v_label, price_line=False, price_label=False)
                     v_data['time'] = xdates
-                    line.set(pd.DataFrame(v_data))
+                    line.set_zipped(pd.DataFrame(v_data))
                     hlines = ind.get('hlines', None)
                     if hlines:
                         for hline in hlines:
@@ -317,7 +317,7 @@ class Plot(with_metaclass(MetaParams, object)):
                     v_data = ind['data']
                     line = chart.create_line(v_label, color=i_color, style=i_style, price_line=False, price_label=False)
                     v_data['time'] = xdates
-                    line.set(pd.DataFrame(v_data))
+                    line.set_zipped(pd.DataFrame(v_data))
                     hlines = ind.get('hlines', None)
                     if hlines:
                         for hline in hlines:
@@ -337,7 +337,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 i_color = 'red'
                 v_data = eq['data']
                 line = chart.create_line(v_label, color=i_color, style=i_style, price_line=False, price_label=False)
-                line.set(pd.DataFrame(v_data))
+                line.set_zipped(pd.DataFrame(v_data))
                 line.create_price_line(price=0, color='lightgreen', width=1, style='sparse_dotted', price_label=False)
             # dd = c_top.get('dd', None)
             # if dd is not None:
@@ -346,7 +346,7 @@ class Plot(with_metaclass(MetaParams, object)):
             #     i_color = 'blue'
             #     v_data = dd['data']
             #     line = chart.create_line(v_label, color=i_color, style=i_style, price_line=False, price_label=False)
-            #     line.set(pd.DataFrame(v_data))
+            #     line.set_zipped(pd.DataFrame(v_data))
             subchart = create_subchart(height=-500)
         else:
             subchart = self.chart
