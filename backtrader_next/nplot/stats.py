@@ -46,7 +46,10 @@ class Statistics(object):
                 title="Drawdown %", color="red", fill="tozeroy", height=350)
         )
 
-        d_cum_retunrs_log_pct = np.log(d_cum_returns + 1) * 100
+        # Use pandas where to handle edge cases and avoid log of negative/zero values
+        # Only compute log where values are positive
+        d_cum_retunrs_log_pct = (d_cum_returns + 1).where(d_cum_returns + 1 > 0, np.nan)
+        d_cum_retunrs_log_pct = np.log(d_cum_retunrs_log_pct) * 100
         self.graphs.append(
             create_fig(
                 x=d_cum_retunrs_log_pct.index, y=d_cum_retunrs_log_pct.values,
@@ -422,7 +425,15 @@ def _expected_return(returns, aggregate=None, compounded=True):
     by calculating the geometric holding period return
     """
     returns = _aggregate_returns(returns, aggregate, compounded)
-    return np.prod(1 + returns) ** (1 / len(returns)) - 1
+    prod_value = np.prod(1 + returns)
+    
+    # Handle negative product values (losses) to avoid complex numbers
+    if len(returns) == 0:
+        return 0
+    if prod_value <= 0:
+        # For negative product, use absolute value and apply sign
+        return -(abs(prod_value) ** (1 / len(returns))) - 1
+    return prod_value ** (1 / len(returns)) - 1
 
 
 def _count_consecutive(data):

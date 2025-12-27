@@ -200,7 +200,7 @@ class Eq(bt.Analyzer):
         s.loc['Equity Final [$]'] = equity[-1]
         s.loc['Equity Peak [$]'] = equity.max()
         s.loc['Commissions [$]'] = commissions
-        s.loc['Cum Return [%]'] = ((equity[-1] - equity[0]) / equity[0] * 100).round(4)
+        s.loc['Cum Return [%]'] = np.round((equity[-1] - equity[0]) / equity[0] * 100, 4)
         # c = ohlc_data.Close.values
         # s.loc['Buy & Hold Return [%]'] = (c[-1] - c[0]) / c[0] * 100  # long-only return
 
@@ -210,33 +210,36 @@ class Eq(bt.Analyzer):
         # Our annualized return matches `empyrical.annual_return(day_returns)` whereas
         # our risk doesn't; they use the simpler approach below.
         annualized_return = (1 + gmean_day_return) ** annual_trading_days - 1
-        s.loc['Return (Ann.) [%]'] = (annualized_return * 100).round(4)
+        s.loc['Return (Ann.) [%]'] = round(annualized_return * 100, 4)
         # s.loc['Risk (Ann.) [%]'] = day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100
-        s.loc['Volatility (Ann.) [%]'] = volatility = (day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100).round(4)
+        s.loc['Volatility (Ann.) [%]'] = volatility = round(day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100, 4)
 
         # CAGR from quantstats
         # _total = day_returns.add(1).prod() - 1
         # _years = (day_returns.index[-1] - day_returns.index[0]).days / annual_trading_days
         # _res = abs(_total + 1.0) ** (1.0 / _years) - 1
-        s.loc['CAGR [%]'] = (((equity[-1]/equity[0]) ** (1/num_years) - 1) * 100).round(4)
+        # Use abs() to handle negative equity ratios (losses) and apply sign back
+        equity_ratio = equity[-1]/equity[0]
+        cagr_value = (abs(equity_ratio) ** (1/num_years) - 1) * np.sign(equity_ratio) if equity_ratio != 0 else 0
+        s.loc['CAGR [%]'] = np.round(cagr_value, 4) * 100
 
         # Sharpe Ratio using arithmetic mean of returns to align with standard definition.
         # See: https://en.wikipedia.org/wiki/Sharpe_ratio
         mean_daily_return = day_returns.mean()
         annualized_mean_return = mean_daily_return * annual_trading_days
-        s.loc['Sharpe Ratio'] = sharpe = ((annualized_mean_return * 100 - risk_free_rate * 100) / (
-                volatility if volatility != 0 else np.nan)).round(4)
+        s.loc['Sharpe Ratio'] = sharpe = np.round((annualized_mean_return * 100 - risk_free_rate * 100) / (
+                volatility if volatility != 0 else np.nan), 4)
 
         # Smart Sharpe Ratio
         skew = day_returns.skew()
         kurt = day_returns.kurt()  # Excess kurtosis
-        s.loc['Skew'] = skew.round(4)
-        s.loc['Kurtosis'] = kurt.round(4)
+        s.loc['Skew'] = np.round(skew, 4)
+        s.loc['Kurtosis'] = np.round(kurt, 4)
         # Smart Sharpe Ratio is a modification of the Sharpe Ratio that accounts for skewness
         # and kurtosis of the returns distribution. It is defined as:
         # Smart Sharpe Ratio = Sharpe Ratio * (1 + (Skewness / 6) * Sharpe Ratio - (Kurtosis / 24) * (Sharpe Ratio ** 2))
         # See: https://www.quantconnect.com/docs/v2/writing-algorithms/indicators/smart-sharpe-ratio
-        s.loc['Smart Sharpe Ratio'] = (sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2))).round(4)
+        s.loc['Smart Sharpe Ratio'] = np.round(sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2)), 4)
 
         # Our Sortino mismatches `empyrical.sortino_ratio()` because they use arithmetic mean return
         _downside_returns = day_returns.clip(-np.inf, 0)
@@ -246,7 +249,7 @@ class Eq(bt.Analyzer):
         s.loc['Sortino Ratio'] = round(sortino_ratio, 4) if not np.isnan(sortino_ratio) else np.nan
 
         # s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
-        s.loc['VWR Ratio'] = (calc_vwr(eq_days=day_eq.to_numpy())).round(4)
+        s.loc['VWR Ratio'] = np.round(calc_vwr(eq_days=day_eq.to_numpy()), 4)
         max_dd = -np.nan_to_num(dd_df.max())
         s.loc['Calmar Ratio'] = round((annualized_return * 100) / abs(max_dd), 4) if max_dd != 0 else np.nan
 
