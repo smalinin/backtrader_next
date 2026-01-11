@@ -43,7 +43,7 @@ class SimpleSizer(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
-        price = data.close[0]+comminfo.p.commission
+        price = data.open[0]+comminfo.p.commission
         size = value / price * (self.p.percents / 100)
         return int(size)
 
@@ -64,14 +64,20 @@ class SmaCross(bt.Strategy):
         if order.status in [order.Submitted, order.Accepted]:  # Order is submitted/accepted
             return  # Do nothing until the order is completed
 
-        elif order.status in [order.Canceled, order.Margin, order.Rejected]:  # Canceled, Margin, Rejected
-            print('Order was Canceled/Margin/Rejected')
+        elif order.status in [order.Canceled]:  # Canceled, Margin, Rejected
+            print('Order was Canceled', self.data.datetime.datetime(0))
+
+        elif order.status in [order.Margin]:  # Canceled, Margin, Rejected
+            print('Order was Margin ', self.data.datetime.datetime(0))
+
+        elif order.status in [order.Rejected]:  # Canceled, Margin, Rejected
+            print('Order was Rejected', self.data.datetime.datetime(0))
 
         self.Order = None  # Reset order
 
 
 
-    def next(self):
+    def next_open(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()
@@ -93,11 +99,12 @@ class SmaCross(bt.Strategy):
 
 
 if __name__ == '__main__':
-    cerebro = bt.Cerebro()
+    cerebro = bt.Cerebro(cheat_on_open=True)
     cerebro.broker.setcash(1_000_000.0)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.setcommission(commission=0, margin=1, mult=1)
-    cerebro.addsizer(SimpleSizer, percents=90)
+    cerebro.broker.set_coo(True)
+    cerebro.broker.setcommission(commission=0, margin=False)
+    cerebro.addsizer(SimpleSizer, percents=99)
 
     df = pd.read_csv(f"AAPL_1d.csv.zip", sep=";")
     df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
@@ -112,30 +119,24 @@ if __name__ == '__main__':
     results = cerebro.run()
     print(f'\nFinal Portfolio Value: {cerebro.broker.getvalue():.2f}\n')
 
-    rc = cerebro.statistics()
+    rc = cerebro.statistics
     print(rc)
 
+    # old plot required matplotlib
+    # cerebro.old_plot(style='candle')
+    
     cerebro.plot(filename="smacross.html")
     cerebro.show_report(filename="smacross_stats.html")
     print("end")
 ```
 
+
 #### Output log
 ```
 Starting Portfolio Value: 1000000.00
 
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
-Order was Canceled/Margin/Rejected
 
-Final Portfolio Value: 13125987.48
+Final Portfolio Value: 34851211.71
 
 Strategy                             SmaCross
 MA1                                        20
@@ -144,37 +145,37 @@ Start                     2000-01-03 00:00:00
 End                       2024-12-31 00:00:00
 Duration                   9129 days 00:00:00
 Equity Start [$]                    1000000.0
-Equity Final [$]              13125987.479046
-Equity Peak [$]               13533263.280804
+Equity Final [$]              34851211.709695
+Equity Peak [$]               36036465.624429
 Commissions [$]                           0.0
-Cum Return [%]                      1212.5987
-Return (Ann.) [%]                     10.8691
-Volatility (Ann.) [%]                 21.0469
-CAGR [%]                               7.3656
-Sharpe Ratio                           0.6044
-Skew                                  -6.1434
-Kurtosis                             219.8529
-Smart Sharpe Ratio                    -1.7922
-Sortino Ratio                           0.812
-VWR Ratio                              3.6777
-Calmar Ratio                           0.1917
-Recovery factor [%]                    5.5986
-Max. Drawdown [%]                    -56.6963
-Avg. Drawdown [%]                      -4.674
-Max. Drawdown Duration     2492 days 00:00:00
-Avg. Drawdown Duration       69 days 00:00:00
-Drawdown Peak             2000-10-03 00:00:00
-# Trades                                   56
-Win Rate [%]                          55.3571
-Best Trade [%]                        92.0365
+Cum Return [%]                      3385.1212
+Return (Ann.) [%]                     15.2939
+Volatility (Ann.) [%]                 28.2518
+CAGR [%]                                 10.3
+Sharpe Ratio                           0.6555
+Skew                                   -3.586
+Kurtosis                             116.5671
+Smart Sharpe Ratio                    -0.9693
+Sortino Ratio                          0.9118
+VWR Ratio                              5.1497
+Calmar Ratio                           0.1977
+Recovery factor [%]                     5.973
+Max. Drawdown [%]                    -77.3588
+Avg. Drawdown [%]                      -5.124
+Max. Drawdown Duration     1679 days 00:00:00
+Avg. Drawdown Duration       59 days 00:00:00
+Drawdown Peak             2001-07-25 00:00:00
+# Trades                                   66
+Win Rate [%]                          56.0606
+Best Trade [%]                       104.0816
 Worst Trade [%]                      -63.5437
-Avg. Trade [%]                         4.8655
+Avg. Trade [%]                         5.5053
 Max. Trade Duration         276 days 00:00:00
-Avg. Trade Duration          85 days 00:00:00
-Profit Factor                          1.1756
-Expectancy [%]                         0.0505
-SQN                                    2.2935
-Kelly Criterion [%]                   37.6406
+Avg. Trade Duration          89 days 00:00:00
+Profit Factor                          1.1697
+Expectancy [%]                         0.0735
+SQN                                    2.3002
+Kelly Criterion [%]                   39.0365
 dtype: object
 end
 ```
