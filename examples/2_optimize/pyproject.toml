@@ -1,10 +1,11 @@
 [project]
 name = "2_optimize"
-version = "0.1.1"
+version = "0.2.0"
 description = "Example of using optimization"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "backtrader-next>=0.2.1",
+    "backtrader-next>=2.1.0",
+    "tqdm>=4.67.1",
 ]
 
