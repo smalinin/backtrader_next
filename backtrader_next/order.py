@@ -31,7 +31,23 @@ from .utils.py3 import with_metaclass, iteritems
 from .metabase import MetaParams
 from .utils import AutoOrderedDict
 
-
+class Counter:
+    def __init__(self, start=1):
+        self.counter = itertools.count(start)
+        self.current = start - 1
+    
+    def next(self):
+        self.current = next(self.counter)
+        return self.current
+    
+    def reset(self, start=1):
+        """Сбросить счетчик на новое значение"""
+        self.counter = itertools.count(start)
+        self.current = start - 1
+    
+    def get_current(self):
+        return self.current
+    
 class OrderExecutionBit(object):
     '''
     Intended to hold information about order execution. A "bit" does not
@@ -257,7 +273,8 @@ class OrderBase(with_metaclass(MetaParams, object)):
         'Canceled', 'Expired', 'Margin', 'Rejected',
     ]
 
-    refbasis = itertools.count(1)  # for a unique identifier per order
+    # refbasis = itertools.count(1)  # for a unique identifier per order
+    refbasis = Counter(1)  # for a unique identifier per order
 
     def _getplimit(self):
         return self._plimit
@@ -300,7 +317,8 @@ class OrderBase(with_metaclass(MetaParams, object)):
         return '\n'.join(tojoin)
 
     def __init__(self):
-        self.ref = next(self.refbasis)
+        # self.ref =   next(self.refbasis)
+        self.ref = self.refbasis.next()
         self.broker = None
         self.info = AutoOrderedDict()
         self.comminfo = None
@@ -380,6 +398,14 @@ class OrderBase(with_metaclass(MetaParams, object)):
             self.dteos = self.data.date2num(dteos)
         else:
             self.dteos = 0.0
+
+    @classmethod
+    def last_ref(cls):
+        return cls.refbasis.get_current()
+    
+    @classmethod
+    def reset_ref(cls, start=1):
+        cls.refbasis.reset(start)
 
     def clone(self):
         # status, triggered and executed are the only moving parts in order
@@ -615,6 +641,69 @@ class Order(OrderBase):
                     # limitoffset is negative when pricelimit was greater
                     # the - allows increasing the price limit if stop increases
                     self.created.pricelimit = price - self._limitoffset
+
+    def to_dict(self):
+        '''Returns a dictionary representation of the order'''
+        odict = dict()
+        for k, v in self.__dict__.items():
+            if isinstance(v, AutoOrderedDict):
+                odict[k] = dict(v)
+            elif isinstance(v, OrderData):
+                odict[k] = {
+                    'dt': v.dt,
+                    'size': v.size,
+                    'price': v.price,
+                    'pricelimit': v.pricelimit,
+                    'remsize': v.remsize,
+                    'trailamount': v.trailamount,
+                    'trailpercent': v.trailpercent,
+                }
+            elif k in ('broker', 'data'):
+                # handled below
+                pass
+            elif k in ('parent',):
+                odict[k] = v.ref if v else None
+                # handled below
+                pass
+            else:
+                odict[k] = v
+        return odict
+
+    @classmethod
+    def from_dict(cls, odict):
+        '''Loads the order data from a dictionary representation'''
+        ordtype = odict.get('ordtype', None)
+        ord = None
+        if ordtype is None:
+            return None
+        if ordtype == cls.Buy:
+            ord = BuyOrder()
+        elif ordtype == cls.Sell:
+            ord = SellOrder()
+        else:
+            ord = Order()
+
+        for key, val in odict.items():
+            if key == 'created' or key == 'executed':
+                ord.created = OrderData(
+                    dt=val.get('dt', None),
+                    size=val.get('size', 0),
+                    price=val.get('price', 0.0),
+                    pricelimit=val.get('pricelimit', 0.0),
+                    trailamount=val.get('trailamount', 0.0),
+                    trailpercent=val.get('trailpercent', 0.0),
+                )
+            elif key == 'info':
+                for ik, iv in val.items():
+                    ord.info[ik] = iv
+            elif key == 'comminfo':
+                ord.comminfo = val  #?? string representation only
+            elif key == 'parent':
+                ref = val
+                ord.parent = None  #??TODO
+            elif hasattr(ord, key):
+                setattr(ord, key, val)
+        return ord
 
 
 class BuyOrder(Order):
