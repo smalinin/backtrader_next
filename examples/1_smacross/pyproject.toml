@@ -1,10 +1,10 @@
 [project]
 name = "1_smacross"
-version = "0.1.1"
+version = "0.2.0"
 description = "Sample of smacross strategy"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "backtrader-next>=0.2.1",
+    "backtrader-next>=2.1.0",
 ]
 
