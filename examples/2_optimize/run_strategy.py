@@ -12,7 +12,7 @@ class SimpleSizer(bt.Sizer):
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
         price = data.close[0]+comminfo.p.commission
-        size = value / price * (self.params.percents / 100)
+        size = value / price * (self.p.percents / 100)
         return int(size)
 
 

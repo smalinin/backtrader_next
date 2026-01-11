@@ -11,7 +11,7 @@ class SimpleSizer(bt.Sizer):
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
         price = data.close[0]+comminfo.p.commission
-        size = value / price * (self.params.percents / 100)
+        size = value / price * (self.p.percents / 100)
         return int(size)
 
 
@@ -23,8 +23,8 @@ class SmaCross(bt.Strategy):
 
     def __init__(self):
         self.Order = None
-        self.ma1 = bt.nind.SMA(self.data.close, period=self.params.MA1)
-        self.ma2 = bt.nind.SMA(self.data.close, period=self.params.MA2)
+        self.ma1 = bt.nind.SMA(self.data.close, period=self.p.MA1)
+        self.ma2 = bt.nind.SMA(self.data.close, period=self.p.MA2)
 
 
     def notify_order(self, order):
