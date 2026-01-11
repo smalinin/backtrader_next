@@ -10,7 +10,7 @@ class SimpleSizer(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
-        price = data.close[0]+comminfo.p.commission
+        price = data.open[0]+comminfo.p.commission
         size = value / price * (self.p.percents / 100)
         return int(size)
 
@@ -37,14 +37,20 @@ class SmaCross(bt.Strategy):
         #     elif order.issell():  # Sell order 
         #         pass
 
-        elif order.status in [order.Canceled, order.Margin, order.Rejected]:  # Canceled, Margin, Rejected
-            print('Order was Canceled/Margin/Rejected')
+        elif order.status in [order.Canceled]:  # Canceled, Margin, Rejected
+            print('Order was Canceled', self.data.datetime.datetime(0))
+
+        elif order.status in [order.Margin]:  # Canceled, Margin, Rejected
+            print('Order was Margin ', self.data.datetime.datetime(0))
+
+        elif order.status in [order.Rejected]:  # Canceled, Margin, Rejected
+            print('Order was Rejected', self.data.datetime.datetime(0))
 
         self.Order = None  # Reset order
 
 
 
-    def next(self):
+    def next_open(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()
@@ -66,11 +72,12 @@ class SmaCross(bt.Strategy):
 
 
 if __name__ == '__main__':
-    cerebro = bt.Cerebro()
+    cerebro = bt.Cerebro(cheat_on_open=True)
     cerebro.broker.setcash(1_000_000.0)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.setcommission(commission=0, margin=1, mult=1)
-    cerebro.addsizer(SimpleSizer, percents=90)
+    cerebro.broker.set_coo(True)
+    cerebro.broker.setcommission(commission=0, margin=False)
+    cerebro.addsizer(SimpleSizer, percents=99)
 
     df = pd.read_csv(f"AAPL_1d.csv.zip", sep=";")
     df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
