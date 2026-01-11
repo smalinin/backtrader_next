@@ -10,16 +10,16 @@ uv run run_optimize.py
 ```
 #### Output log
 ```
-==Opt time : 8.7383 seconds==
-   Strategy  MA1  MA2      Start        End  Duration  Equity Start [$]  Equity Final [$]  ...  Worst Trade [%]  Avg. Trade [%]  Max. Trade Duration  Avg. Trade Duration  Profit Factor  Expectancy [%]     SQN  Kelly Criterion [%]
-0  SmaCross   10   50 2010-01-04 2024-12-31 5475 days         1000000.0      4.188669e+06  ...         -11.0000          3.2100             256 days              74 days         1.1507          0.0436  2.0105              28.9543
-1  SmaCross   10   55 2010-01-04 2024-12-31 5475 days         1000000.0      4.333700e+06  ...         -11.1497          4.0542             262 days              90 days         1.1541          0.0445  2.0614              31.9269
-2  SmaCross   10   60 2010-01-04 2024-12-31 5475 days         1000000.0      4.671951e+06  ...         -11.1072          4.6047             629 days              97 days         1.1597          0.0466  1.8073              29.4843
-3  SmaCross   10   65 2010-01-04 2024-12-31 5475 days         1000000.0      4.709983e+06  ...         -11.1469          4.7109             628 days             100 days         1.1606          0.0469  1.7976              26.6267
-4  SmaCross   10   70 2010-01-04 2024-12-31 5475 days         1000000.0      4.811946e+06  ...         -10.5054          4.8914             629 days             103 days         1.1618          0.0475  1.8491              31.4215
+Optimization...: 100%|█████████████████████████████████████████████████████████████████| 80/80 [00:05<00:00, 14.98it/s]
+==Opt time : 5.3422 seconds==
+   Strategy  MA1  MA2      Start  ... Profit Factor Expectancy [%]     SQN  Kelly Criterion [%]
+0  SmaCross   10   50 2010-01-04  ...        1.1509         0.0474  1.9570              28.6075
+1  SmaCross   10   55 2010-01-04  ...        1.1553         0.0488  2.0050              31.6561
+2  SmaCross   10   60 2010-01-04  ...        1.1601         0.0508  1.7574              29.0871
+3  SmaCross   10   65 2010-01-04  ...        1.1607         0.0509  1.7398              26.1528
+4  SmaCross   10   70 2010-01-04  ...        1.1619         0.0516  1.7939              30.9278
 
 [5 rows x 38 columns]
-
 Index(['Strategy', 'MA1', 'MA2', 'Start', 'End', 'Duration',
        'Equity Start [$]', 'Equity Final [$]', 'Equity Peak [$]',
        'Commissions [$]', 'Cum Return [%]', 'Return (Ann.) [%]',
@@ -34,12 +34,14 @@ Index(['Strategy', 'MA1', 'MA2', 'Start', 'End', 'Duration',
 
 
  MA1  MA2  Sharpe Ratio  Cum Return [%]  Return (Ann.) [%]  Max. Drawdown [%]
-  35   65        0.8049        621.8594            14.1133           -32.6211
-  20   95        0.7972        621.4102            14.1086           -26.3586
-  20   80        0.7883        587.1283            13.7381           -30.5704
-  15   95        0.7869        588.6359            13.7548           -28.5787
-  10   85        0.7866        535.4134            13.1453           -25.5787
+  35   65        0.8096        749.5372            15.3614           -34.7825
+  20   95        0.8030        742.4304            15.2967           -27.8812
+  20   80        0.7947        701.2967            14.9118           -32.7819
+  10   85        0.7894        631.6195            14.2157           -27.6852
+  15   95        0.7841        670.1736            14.6082           -30.2628
+
 ```
+
 ####  Optimization results saved to file  [opt_results.csv](https://smalinin.github.io/backtrader_next/2_optimize/opt_results.csv) 
 
 ```csv
@@ -58,6 +60,7 @@ Index(['Strategy', 'MA1', 'MA2', 'Start', 'End', 'Duration',
 ```
 uv run run_strategy.py
 ```
+
 #### Output log
 ```
 Strategy                             SmaCross
@@ -67,23 +70,23 @@ Start                     2010-01-04 00:00:00
 End                       2024-12-31 00:00:00
 Duration                   5475 days 00:00:00
 Equity Start [$]                    1000000.0
-Equity Final [$]               7218593.659401
-Equity Peak [$]                8087290.121056
+Equity Final [$]               8495372.329411
+Equity Peak [$]                9625789.265913
 Commissions [$]                           0.0
-Cum Return [%]                       621.8594
-Return (Ann.) [%]                     14.1133
-Volatility (Ann.) [%]                  18.548
-CAGR [%]                               9.5248
-Sharpe Ratio                           0.8049
-Skew                                  -0.1963
-Kurtosis                              15.8372
-Smart Sharpe Ratio                     0.4396
-Sortino Ratio                          1.1743
-VWR Ratio                              4.8679
-Calmar Ratio                           0.4326
-Recovery factor [%]                    6.8521
-Max. Drawdown [%]                    -32.6211
-Avg. Drawdown [%]                     -2.8806
+Cum Return [%]                       749.5372
+Return (Ann.) [%]                     15.3614
+Volatility (Ann.) [%]                 20.1744
+CAGR [%]                                10.35
+Sharpe Ratio                           0.8096
+Skew                                   -0.164
+Kurtosis                              15.8821
+Smart Sharpe Ratio                     0.4405
+Sortino Ratio                          1.1834
+VWR Ratio                              5.2601
+Calmar Ratio                           0.4416
+Recovery factor [%]                    7.0306
+Max. Drawdown [%]                    -34.7825
+Avg. Drawdown [%]                      -3.103
 Max. Drawdown Duration     1098 days 00:00:00
 Avg. Drawdown Duration       35 days 00:00:00
 Drawdown Peak             2023-01-05 00:00:00
@@ -94,12 +97,13 @@ Worst Trade [%]                      -15.1364
 Avg. Trade [%]                         8.8499
 Max. Trade Duration         846 days 00:00:00
 Avg. Trade Duration         145 days 00:00:00
-Profit Factor                          1.1934
-Expectancy [%]                         0.0592
-SQN                                    2.2167
-Kelly Criterion [%]                    49.468
+Profit Factor                          1.1947
+Expectancy [%]                         0.0648
+SQN                                    2.1723
+Kelly Criterion [%]                   49.2085
 dtype: object
 ```
+
 #### Addons
 Also it will create two HTML files  and open it in your current browser.
 - [smacross.html](https://smalinin.github.io/backtrader_next/2_optimize/smacross.html)  - charts and trade stats  
