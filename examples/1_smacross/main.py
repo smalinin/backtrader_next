@@ -10,7 +10,7 @@ class SimpleSizer(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
-        price = data.open[0]+comminfo.p.commission
+        price = data.close[0]+comminfo.p.commission
         size = value / price * (self.p.percents / 100)
         return int(size)
 
@@ -50,7 +50,7 @@ class SmaCross(bt.Strategy):
 
 
 
-    def next_open(self):
+    def next(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()
@@ -72,12 +72,11 @@ class SmaCross(bt.Strategy):
 
 
 if __name__ == '__main__':
-    cerebro = bt.Cerebro(cheat_on_open=True)
+    cerebro = bt.Cerebro()
     cerebro.broker.setcash(1_000_000.0)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.set_coo(True)
     cerebro.broker.setcommission(commission=0, margin=False)
-    cerebro.addsizer(SimpleSizer, percents=99)
+    cerebro.addsizer(SimpleSizer, percents=90)
 
     df = pd.read_csv(f"AAPL_1d.csv.zip", sep=";")
     df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')

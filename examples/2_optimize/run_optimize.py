@@ -7,12 +7,11 @@ from strategy import SimpleSizer, SmaCross
 
 if __name__ == '__main__':
 
-    cerebro = bt.Cerebro(cheat_on_open=True)
+    cerebro = bt.Cerebro()
     cerebro.broker.setcash(1_000_000.0)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.set_coo(True)
     cerebro.broker.setcommission(commission=0, margin=False)
-    cerebro.addsizer(SimpleSizer, percents=99)
+    cerebro.addsizer(SimpleSizer, percents=90)
 
     df = pd.read_csv(f"MSFT_1d.csv.zip", sep=";")
     df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')

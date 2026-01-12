@@ -9,7 +9,7 @@ class SimpleSizer(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
-        price = data.open[0]+comminfo.p.commission
+        price = data.close[0]+comminfo.p.commission
         size = value / price * (self.p.percents / 100)
         return int(size)
 
@@ -49,7 +49,7 @@ class SmaCross(bt.Strategy):
 
 
 
-    def next_open(self):
+    def next(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()

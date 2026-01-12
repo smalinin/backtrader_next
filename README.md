@@ -43,7 +43,7 @@ class SimpleSizer(bt.Sizer):
 
     def _getsizing(self, comminfo, cash, data, isbuy):
         value = self.broker.getvalue()
-        price = data.open[0]+comminfo.p.commission
+        price = data.close[0]+comminfo.p.commission
         size = value / price * (self.p.percents / 100)
         return int(size)
 
@@ -64,6 +64,12 @@ class SmaCross(bt.Strategy):
         if order.status in [order.Submitted, order.Accepted]:  # Order is submitted/accepted
             return  # Do nothing until the order is completed
 
+        # if order.status in [order.Completed]:  # Order is completed
+        #     if order.isbuy():  # Buy order
+        #         pass
+        #     elif order.issell():  # Sell order 
+        #         pass
+
         elif order.status in [order.Canceled]:  # Canceled, Margin, Rejected
             print('Order was Canceled', self.data.datetime.datetime(0))
 
@@ -77,7 +83,7 @@ class SmaCross(bt.Strategy):
 
 
 
-    def next_open(self):
+    def next(self):
         # Use ONLY Long Positions
         if self.crossover(self.ma1, self.ma2):
             pos = self.getposition()
@@ -99,12 +105,11 @@ class SmaCross(bt.Strategy):
 
 
 if __name__ == '__main__':
-    cerebro = bt.Cerebro(cheat_on_open=True)
+    cerebro = bt.Cerebro()
     cerebro.broker.setcash(1_000_000.0)
     cerebro.broker.set_shortcash(False)
-    cerebro.broker.set_coo(True)
     cerebro.broker.setcommission(commission=0, margin=False)
-    cerebro.addsizer(SimpleSizer, percents=99)
+    cerebro.addsizer(SimpleSizer, percents=90)
 
     df = pd.read_csv(f"AAPL_1d.csv.zip", sep=";")
     df['Datetime'] = pd.to_datetime(df['Date'].astype(str) , format='%Y-%m-%d')
@@ -136,7 +141,7 @@ if __name__ == '__main__':
 Starting Portfolio Value: 1000000.00
 
 
-Final Portfolio Value: 34851211.71
+Final Portfolio Value: 29343500.38
 
 Strategy                             SmaCross
 MA1                                        20
@@ -145,24 +150,24 @@ Start                     2000-01-03 00:00:00
 End                       2024-12-31 00:00:00
 Duration                   9129 days 00:00:00
 Equity Start [$]                    1000000.0
-Equity Final [$]              34851211.709695
-Equity Peak [$]               36036465.624429
+Equity Final [$]              29343500.384917
+Equity Peak [$]               30253994.128875
 Commissions [$]                           0.0
-Cum Return [%]                      3385.1212
-Return (Ann.) [%]                     15.2939
-Volatility (Ann.) [%]                 28.2518
-CAGR [%]                                 10.3
-Sharpe Ratio                           0.6555
-Skew                                   -3.586
-Kurtosis                             116.5671
-Smart Sharpe Ratio                    -0.9693
-Sortino Ratio                          0.9118
-VWR Ratio                              5.1497
-Calmar Ratio                           0.1977
-Recovery factor [%]                     5.973
-Max. Drawdown [%]                    -77.3588
-Avg. Drawdown [%]                      -5.124
-Max. Drawdown Duration     1679 days 00:00:00
+Cum Return [%]                        2834.35
+Return (Ann.) [%]                     14.5018
+Volatility (Ann.) [%]                 25.7613
+CAGR [%]                                 9.78
+Sharpe Ratio                           0.6617
+Skew                                   -3.199
+Kurtosis                             102.0707
+Smart Sharpe Ratio                    -0.8039
+Sortino Ratio                          0.9247
+VWR Ratio                              4.8799
+Calmar Ratio                           0.2017
+Recovery factor [%]                    5.9154
+Max. Drawdown [%]                    -71.9018
+Avg. Drawdown [%]                     -4.7983
+Max. Drawdown Duration     1666 days 00:00:00
 Avg. Drawdown Duration       59 days 00:00:00
 Drawdown Peak             2001-07-25 00:00:00
 # Trades                                   66
@@ -172,10 +177,10 @@ Worst Trade [%]                      -63.5437
 Avg. Trade [%]                         5.5053
 Max. Trade Duration         276 days 00:00:00
 Avg. Trade Duration          89 days 00:00:00
-Profit Factor                          1.1697
-Expectancy [%]                         0.0735
-SQN                                    2.3002
-Kelly Criterion [%]                   39.0365
+Profit Factor                          1.1704
+Expectancy [%]                         0.0676
+SQN                                    2.4064
+Kelly Criterion [%]                   39.2016
 dtype: object
 end
 ```
