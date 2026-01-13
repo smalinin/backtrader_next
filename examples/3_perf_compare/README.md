@@ -6,7 +6,7 @@ The comparison is based on a dual moving average crossover strategy tested on 43
 
 ## Backtesting Frameworks
 
-1. [Backtesting.py](https://github.com/kernc/backtesting.py) - Lightweight and easy-to-use framework
+1. [Backtesting.py](https://github.com/kernc/backtesting.py) - Lightweight and easy-to-use framework (doesn't support trading, only for backtesting)
 2. [Backtrader](https://github.com/mementum/backtrader) - Feature-rich framework with extensive capabilities
 3. [Backtrader-next](https://github.com/smalinin/backtrader_next) - Modern fork of Backtrader with optimizations  
 
