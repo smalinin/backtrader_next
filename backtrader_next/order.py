@@ -283,6 +283,21 @@ class OrderBase(with_metaclass(MetaParams, object)):
         self._plimit = val
 
     plimit = property(_getplimit, _setplimit)
+    
+    @property
+    def owner(self):
+        if self._owner_classname and not self.p.owner:
+            class_name = self._owner_classname
+            for s in self.broker.cerebro.runningstrategies:
+                if s.__class__.__name__ == class_name:
+                    self.p.owner = s
+                    self._owner_classname = None
+                    break
+        return self.p.owner
+    
+    @owner.setter
+    def owner(self, value):
+        self.p.owner = value
 
     def __getattr__(self, name):
         # Return attr from params if not found in order
@@ -323,6 +338,9 @@ class OrderBase(with_metaclass(MetaParams, object)):
         self.info = AutoOrderedDict()
         self.comminfo = None
         self.triggered = False
+        self.parent_ref = None
+        self._owner_classname = None
+        self._restored = False
 
         self._active = self.parent is None
         self.status = Order.Created
@@ -337,10 +355,10 @@ class OrderBase(with_metaclass(MetaParams, object)):
 
         # Set a reference price if price is not set using
         # the close price
-        pclose = self.data.close[0] if not self.p.simulated else self.price
+        pclose = self.data.close[0] if not self.p.simulated and not self._restored else self.price
         price = pclose if not self.price and not self.pricelimit else self.price
 
-        dcreated = self.data.datetime[0] if not self.p.simulated else 0.0
+        dcreated = self.data.datetime[0] if not self.p.simulated and not self._restored else 0.0
         self.created = OrderData(dt=dcreated,
                                  size=self.size,
                                  price=price,
@@ -382,7 +400,7 @@ class OrderBase(with_metaclass(MetaParams, object)):
             else:  # assume float
                 valid = self.data.datetime[0] + self.valid
 
-        if not self.p.simulated:
+        if not self.p.simulated and not self._restored:
             # provisional end-of-session
             # get next session end
             dtime = self.data.datetime.datetime(0)
@@ -655,52 +673,80 @@ class Order(OrderBase):
                     'price': v.price,
                     'pricelimit': v.pricelimit,
                     'remsize': v.remsize,
+                    'pclose': v.pclose,
                     'trailamount': v.trailamount,
                     'trailpercent': v.trailpercent,
+                    'value': v.value,
+                    'comm': v.comm,
+                    'margin': v.margin,
+                    'pnl': v.pnl,
+                    'psize': v.psize,
+                    'pprice': v.pprice,
                 }
-            elif k in ('broker', 'data'):
+            elif k in ('broker', 'data','params','comminfo','info',):
                 # handled below
                 pass
-            elif k in ('parent',):
-                odict[k] = v.ref if v else None
+            elif k == 'parent':
+                odict['parent'] = None
+                if v is not None:
+                    odict['parent_ref'] = v.ref
                 # handled below
-                pass
+            elif k in ('p',):
+                odict['params'] = vars(v).copy()
+                odict['params']['_owner_classname'] = v.owner.__class__.__qualname__ if v.owner else None
+                odict['params']['owner'] = None
+                odict['params']['data'] = v.data._name if v.data else None
             else:
                 odict[k] = v
+        odict['ordtype'] = self.ordtype
         return odict
 
     @classmethod
-    def from_dict(cls, odict):
+    def from_dict(cls, params, odict):
         '''Loads the order data from a dictionary representation'''
+        odict['_restored'] = True
         ordtype = odict.get('ordtype', None)
         ord = None
         if ordtype is None:
-            return None
+            ord = Order(**params)
         if ordtype == cls.Buy:
-            ord = BuyOrder()
+            ord = BuyOrder(**params)
         elif ordtype == cls.Sell:
-            ord = SellOrder()
+            ord = SellOrder(**params)
         else:
-            ord = Order()
+            ord = Order(**params)
 
         for key, val in odict.items():
-            if key == 'created' or key == 'executed':
-                ord.created = OrderData(
+            if key in ('created', 'executed'):
+                odata = OrderData(
                     dt=val.get('dt', None),
                     size=val.get('size', 0),
                     price=val.get('price', 0.0),
                     pricelimit=val.get('pricelimit', 0.0),
+                    remsize=val.get('remsize', 0),
+                    pclose=val.get('pclose', 0.0),
                     trailamount=val.get('trailamount', 0.0),
                     trailpercent=val.get('trailpercent', 0.0),
                 )
+                odata.value = val.get('value', 0.0)
+                odata.comm = val.get('comm', 0.0)
+                odata.margin = val.get('margin', None)
+                odata.pnl = val.get('pnl', 0.0)
+                odata.psize = val.get('psize', 0)
+                odata.pprice = val.get('pprice', 0.0)
+                if key == 'created':
+                    ord.created = odata
+                else:
+                    ord.executed = odata
+            elif key in ('ordtype', 'params'):
+                pass # already handled
             elif key == 'info':
                 for ik, iv in val.items():
                     ord.info[ik] = iv
             elif key == 'comminfo':
-                ord.comminfo = val  #?? string representation only
+                ord.comminfo = None
             elif key == 'parent':
-                ref = val
-                ord.parent = None  #??TODO
+                ord.parent = None
             elif hasattr(ord, key):
                 setattr(ord, key, val)
         return ord
