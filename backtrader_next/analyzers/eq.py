@@ -7,15 +7,13 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame as df
 from numbers import Number
-from typing import Dict, List, Optional, Sequence, Union, cast
+from typing import Union
 import math
-# from math import copysign
 
 
 class Eq(bt.Analyzer):
-    '''This analyzer calculates trading system drawdowns stats such as drawdown
-    values in %s and in dollars, max drawdown in %s and in dollars, drawdown
-    length and drawdown max length
+    '''This analyzer calculates comprehensive trading system performance statistics
+    including equity curves, drawdown analysis, returns, risk metrics, and trade statistics.
 
     Params:
 
@@ -28,20 +26,42 @@ class Eq(bt.Analyzer):
 
         Set it to ``True`` or ``False`` for a specific behavior
 
+      - ``data`` (default: ``None``)
+
+        Specific data feed to analyze. If ``None``, all data is analyzed.
+
+      - ``cash`` (default: ``True``)
+
+        Whether to include cash information in equity tracking.
+
     Methods:
 
-      - ``get_analysis``
+      - ``compute_stats(risk_free_rate=0.0)``
 
-        Returns a dictionary (with . notation support and subdctionaries) with
-        drawdown stats as values, the following keys/attributes are available:
+        Returns a pandas Series with comprehensive trading statistics including:
 
-        - ``drawdown`` - drawdown value in 0.xx %
-        - ``moneydown`` - drawdown value in monetary units
-        - ``len`` - drawdown length
+        - Equity metrics: Start, End, Duration, Peak equity
+        - Returns: Cumulative return %, Annualized return, CAGR
+        - Risk metrics: Volatility (Ann.), Sharpe Ratio, Sortino Ratio, Smart Sharpe Ratio
+        - Drawdown stats: Max Drawdown %, Avg Drawdown %, Drawdown Duration
+        - Trade statistics: Win Rate, Best/Worst/Avg Trade, # of Trades
+        - Performance ratios: Calmar Ratio, VWR Ratio, Profit Factor, SQN, Kelly Criterion
 
-        - ``max.drawdown`` - max drawdown value in 0.xx %
-        - ``max.moneydown`` - max drawdown value in monetary units
-        - ``max.len`` - max drawdown length
+      - ``gen_eq()``
+
+        Returns equity curve as a pandas DataFrame with datetime index.
+
+      - ``gen_eq_dd()``
+
+        Returns equity and drawdown data as a pandas DataFrame.
+
+      - ``gen_trades(data_name=None, pct=False)``
+
+        Returns trade-level statistics as a pandas DataFrame.
+
+      - ``gen_orders(data_name=None)``
+
+        Returns order history as a pandas DataFrame.
     '''
 
     params = (
@@ -136,7 +156,6 @@ class Eq(bt.Analyzer):
     def gen_trades(self, data_name=None, pct=False) -> 'DataFrame':
         if self.trades_df is None:
             self.trades_df = df.from_records(self.trades, columns=self.trades_header)
-            # self.trades_df = df.from_records(self.trades, index=self.trades_header[0], columns=self.trades_header)
         if data_name is None:
             rdf = self.trades_df.copy()
         else:
@@ -211,7 +230,6 @@ class Eq(bt.Analyzer):
         # our risk doesn't; they use the simpler approach below.
         annualized_return = (1 + gmean_day_return) ** annual_trading_days - 1
         s.loc['Return (Ann.) [%]'] = round(annualized_return * 100, 4)
-        # s.loc['Risk (Ann.) [%]'] = day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100
         s.loc['Volatility (Ann.) [%]'] = volatility = round(day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100, 4)
 
         # CAGR from quantstats
@@ -286,10 +304,6 @@ class Eq(bt.Analyzer):
         else:
             s.loc['Kelly Criterion [%]'] = np.nan
 
-        # s.loc['_strategy'] = strategy_instance
-        # s.loc['_equity_curve'] = equity_df
-        # s.loc['_trades'] = trades_df
-        #
         return s
 
 
@@ -321,39 +335,6 @@ def geometric_mean(returns: pd.Series) -> float:
         return 0
     return np.exp(np.log(returns).sum() / (len(returns) or np.nan)) - 1
 
-
-def calc_vwr0(eq_days: np.array, sdev_max=2.0, tau=0.20) -> float:
-    eq = eq_days #.to_numpy()
-    eq_0 = eq_days.shift().to_numpy()
-
-    try:
-        nlrtot = eq[-1] / eq[0]
-    except ZeroDivisionError:
-        rtot = float('-inf')
-    else:
-        if nlrtot <= 0.0:
-            rtot = float('-inf')
-        else:
-            rtot = math.log(nlrtot)
-
-    ravg = rtot / len(eq)
-    rnorm = math.expm1(ravg * 252)
-    rnorm100 = rnorm * 100.0
-
-    dts = []
-    for n, zip_data in enumerate(zip(eq_0, eq), 0):
-        eq0, eq1 = zip_data
-        if (n > 0):
-            _v = (eq0 * math.exp(ravg * n))
-            if _v != 0:
-                dt = eq1 / (eq0 * math.exp(ravg * n)) - 1.0
-                dts.append(dt)
-            else:
-                dts.append(0.0)
-
-    sdev_p = np.array(dts).std(ddof=True)
-    vwr = rnorm100 * (1.0 - pow(sdev_p / sdev_max, tau))
-    return vwr
 
 #    calc VariabilityWeightedReturn
 #    See:
