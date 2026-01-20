@@ -15,6 +15,7 @@ Live Trading and backtesting platform written in Python.
 ```
 pip install backtrader-next
 ```
+
 ## History
 Package is based on [backtrader](https://github.com/mementum/backtrader)
 
@@ -28,6 +29,21 @@ Changes:
  - Improved performance — now it runs about 2–3× slower than Backtesting.py in `runonce=True` mode with `PandasData`.
  - Detailed results
  - Interactive visualizations
+
+## Performance
+
+Performance comparison using the [perf_sample](https://github.com/smalinin/backtrader_next/tree/master/examples/3_perf_compare) benchmark.
+
+- **Backtrader-next**  using an optimized **PandasData** feed 
+- [Backtrader](https://github.com/mementum/backtrader) with **PandasData** feed
+- [Backtesting.py](https://github.com/kernc/backtesting.py) 
+
+| Framework | Execution Time | Relative Speed |
+|---|---|---|
+| Backtesting | 2.95 sec | 14.3x faster than Backtrader |
+| Backtrader-next | 12.33 sec | 3.4x faster than Backtrader |
+| Backtrader | 42.25 sec | Baseline |
+
 
 ## Here a snippet of a Simple Moving Average CrossOver.
 ```python
