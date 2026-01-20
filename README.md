@@ -32,7 +32,7 @@ Changes:
 
 ## Performance
 
-Performance comparison using the [perf_sample](https://github.com/smalinin/backtrader_next/tree/master/examples/3_perf_compare) benchmark.
+Performance comparison using the [perf_compare](https://github.com/smalinin/backtrader_next/tree/master/examples/3_perf_compare) benchmark.
 
 - **Backtrader-next**  using an optimized **PandasData** feed 
 - [Backtrader](https://github.com/mementum/backtrader) with **PandasData** feed
