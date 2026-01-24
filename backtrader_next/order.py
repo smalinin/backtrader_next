@@ -245,6 +245,7 @@ class OrderBase(with_metaclass(MetaParams, object)):
         ('simulated', False),
         # To support historical order evaluation
         ('histnotify', False),
+        ('restored', False),
     )
 
     DAY = datetime.timedelta()  # constant for DAY order identification
@@ -273,7 +274,6 @@ class OrderBase(with_metaclass(MetaParams, object)):
         'Canceled', 'Expired', 'Margin', 'Rejected',
     ]
 
-    # refbasis = itertools.count(1)  # for a unique identifier per order
     refbasis = Counter(1)  # for a unique identifier per order
 
     def _getplimit(self):
@@ -283,18 +283,18 @@ class OrderBase(with_metaclass(MetaParams, object)):
         self._plimit = val
 
     plimit = property(_getplimit, _setplimit)
-    
+
     @property
     def owner(self):
         if self._owner_classname and not self.p.owner:
             class_name = self._owner_classname
-            for s in self.broker.cerebro.runningstrategies:
+            for s in self.broker.cerebro.runningstrats:
                 if s.__class__.__name__ == class_name:
                     self.p.owner = s
                     self._owner_classname = None
                     break
         return self.p.owner
-    
+
     @owner.setter
     def owner(self, value):
         self.p.owner = value
@@ -340,7 +340,6 @@ class OrderBase(with_metaclass(MetaParams, object)):
         self.triggered = False
         self.parent_ref = None
         self._owner_classname = None
-        self._restored = False
 
         self._active = self.parent is None
         self.status = Order.Created
@@ -355,10 +354,10 @@ class OrderBase(with_metaclass(MetaParams, object)):
 
         # Set a reference price if price is not set using
         # the close price
-        pclose = self.data.close[0] if not self.p.simulated and not self._restored else self.price
+        pclose = self.data.close[0] if not self.p.simulated and not self.p.restored else self.price
         price = pclose if not self.price and not self.pricelimit else self.price
 
-        dcreated = self.data.datetime[0] if not self.p.simulated and not self._restored else 0.0
+        dcreated = self.data.datetime[0] if not self.p.simulated and not self.p.restored else 0.0
         self.created = OrderData(dt=dcreated,
                                  size=self.size,
                                  price=price,
@@ -400,7 +399,7 @@ class OrderBase(with_metaclass(MetaParams, object)):
             else:  # assume float
                 valid = self.data.datetime[0] + self.valid
 
-        if not self.p.simulated and not self._restored:
+        if not self.p.simulated and not self.p.restored:
             # provisional end-of-session
             # get next session end
             dtime = self.data.datetime.datetime(0)
@@ -420,7 +419,7 @@ class OrderBase(with_metaclass(MetaParams, object)):
     @classmethod
     def last_ref(cls):
         return cls.refbasis.get_current()
-    
+
     @classmethod
     def reset_ref(cls, start=1):
         cls.refbasis.reset(start)
@@ -704,7 +703,9 @@ class Order(OrderBase):
     @classmethod
     def from_dict(cls, params, odict):
         '''Loads the order data from a dictionary representation'''
-        odict['_restored'] = True
+        odict['_owner_classname'] = params['_owner_classname']
+        del params['_owner_classname']
+        params['restored'] = True
         ordtype = odict.get('ordtype', None)
         ord = None
         if ordtype is None:
