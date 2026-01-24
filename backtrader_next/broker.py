@@ -52,6 +52,7 @@ class BrokerBase(with_metaclass(MetaBroker, object)):
 
     def __init__(self):
         self.comminfo = dict()
+        self.state = dict()
         self.init()
 
     def init(self):
