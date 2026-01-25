@@ -707,16 +707,15 @@ class Order(OrderBase):
         del params['_owner_classname']
         params['restored'] = True
         ordtype = odict.get('ordtype', None)
-        ord = None
+        new_ord = None
         if ordtype is None:
-            ord = Order(**params)
+            new_ord = Order(**params)
         if ordtype == cls.Buy:
-            ord = BuyOrder(**params)
+            new_ord = BuyOrder(**params)
         elif ordtype == cls.Sell:
-            ord = SellOrder(**params)
+            new_ord = SellOrder(**params)
         else:
-            ord = Order(**params)
-
+            new_ord = Order(**params)
         for key, val in odict.items():
             if key in ('created', 'executed'):
                 odata = OrderData(
@@ -736,21 +735,21 @@ class Order(OrderBase):
                 odata.psize = val.get('psize', 0)
                 odata.pprice = val.get('pprice', 0.0)
                 if key == 'created':
-                    ord.created = odata
+                    new_ord.created = odata
                 else:
-                    ord.executed = odata
+                    new_ord.executed = odata
             elif key in ('ordtype', 'params'):
                 pass # already handled
             elif key == 'info':
                 for ik, iv in val.items():
-                    ord.info[ik] = iv
+                    new_ord.info[ik] = iv
             elif key == 'comminfo':
-                ord.comminfo = None
+                new_ord.comminfo = None
             elif key == 'parent':
-                ord.parent = None
-            elif hasattr(ord, key):
-                setattr(ord, key, val)
-        return ord
+                new_ord.parent = None
+            elif hasattr(new_ord, key):
+                setattr(new_ord, key, val)
+        return new_ord
 
 
 class BuyOrder(Order):

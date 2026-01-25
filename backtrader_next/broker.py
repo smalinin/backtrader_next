@@ -19,10 +19,12 @@
 #
 ###############################################################################
 from __future__ import (absolute_import, division, print_function, unicode_literals)
+from collections import defaultdict
 
 from backtrader_next.comminfo import CommInfoBase
 from backtrader_next.metabase import MetaParams
-from backtrader_next.utils.py3 import with_metaclass
+
+from .utils.py3 import with_metaclass, iteritems
 
 from . import fillers as fillers
 from . import fillers as filler
@@ -52,7 +54,7 @@ class BrokerBase(with_metaclass(MetaBroker, object)):
 
     def __init__(self):
         self.comminfo = dict()
-        self.state = dict()
+        self.info = defaultdict(dict)
         self.init()
 
     def init(self):
@@ -65,6 +67,13 @@ class BrokerBase(with_metaclass(MetaBroker, object)):
 
     def stop(self):
         pass
+
+    def add_info(self, strat_name:str, **kwargs):
+        '''Add the keys, values of kwargs to the internal info dictionary to
+        hold custom information in the broker
+        '''
+        for key, val in iteritems(kwargs):
+            self.info[strat_name][key] = val
 
     def add_order_history(self, orders, notify=False):
         '''Add order history. See cerebro for details'''

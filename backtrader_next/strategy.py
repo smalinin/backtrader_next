@@ -1,4 +1,4 @@
-#!/usr/bin389/env python
+#!/usr/bin/env python
 # -*- coding: utf-8; py-indent-offset:4 -*-
 ###############################################################################
 #
@@ -117,6 +117,17 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
     # keep the latest delivered data date in the line
     lines = ('datetime',)
+
+    def add_info(self, strat_name:str, **kwargs):
+        '''Add the keys, values of kwargs to the internal info dictionary to
+        hold custom information in the broker
+        '''
+        self.broker.add_info(strat_name, kwargs)
+
+    def get_info(self, strat_name:str):
+        '''Get the info dictionary for the given strategy name from the broker
+        '''
+        return self.broker.get_info(strat_name)
 
     def qbuffer(self, savemem=0, replaying=False):
         '''Enable the memory saving schemes. Possible values for ``savemem``:
