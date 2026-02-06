@@ -216,10 +216,10 @@ class Eq(bt.Analyzer):
         s.loc['Duration'] = s.End - s.Start
 
         s.loc['Equity Start [$]'] = equity[0]
-        s.loc['Equity Final [$]'] = equity[-1]
-        s.loc['Equity Peak [$]'] = equity.max()
-        s.loc['Commissions [$]'] = commissions
-        s.loc['Cum Return [%]'] = np.round((equity[-1] - equity[0]) / equity[0] * 100, 4)
+        s.loc['Equity Final [$]'] = round(equity[-1], 4)
+        s.loc['Equity Peak [$]'] = round(equity.max(), 4)
+        s.loc['Commissions [$]'] = round(commissions, 4)
+        s.loc['Cum Return [%]'] = round((equity[-1] - equity[0]) / equity[0] * 100, 4)
         # c = ohlc_data.Close.values
         # s.loc['Buy & Hold Return [%]'] = (c[-1] - c[0]) / c[0] * 100  # long-only return
 
@@ -239,25 +239,25 @@ class Eq(bt.Analyzer):
         # Use abs() to handle negative equity ratios (losses) and apply sign back
         equity_ratio = equity[-1]/equity[0]
         cagr_value = (abs(equity_ratio) ** (1/num_years) - 1) * np.sign(equity_ratio) if equity_ratio != 0 else 0
-        s.loc['CAGR [%]'] = np.round(cagr_value, 4) * 100
+        s.loc['CAGR [%]'] = round(cagr_value, 4) * 100
 
         # Sharpe Ratio using arithmetic mean of returns to align with standard definition.
         # See: https://en.wikipedia.org/wiki/Sharpe_ratio
         mean_daily_return = day_returns.mean()
         annualized_mean_return = mean_daily_return * annual_trading_days
-        s.loc['Sharpe Ratio'] = sharpe = np.round((annualized_mean_return * 100 - risk_free_rate * 100) / (
+        s.loc['Sharpe Ratio'] = sharpe = round((annualized_mean_return * 100 - risk_free_rate * 100) / (
                 volatility if volatility != 0 else np.nan), 4)
 
         # Smart Sharpe Ratio
         skew = day_returns.skew()
         kurt = day_returns.kurt()  # Excess kurtosis
-        s.loc['Skew'] = np.round(skew, 4)
-        s.loc['Kurtosis'] = np.round(kurt, 4)
+        s.loc['Skew'] = round(skew, 4)
+        s.loc['Kurtosis'] = round(kurt, 4)
         # Smart Sharpe Ratio is a modification of the Sharpe Ratio that accounts for skewness
         # and kurtosis of the returns distribution. It is defined as:
         # Smart Sharpe Ratio = Sharpe Ratio * (1 + (Skewness / 6) * Sharpe Ratio - (Kurtosis / 24) * (Sharpe Ratio ** 2))
         # See: https://www.quantconnect.com/docs/v2/writing-algorithms/indicators/smart-sharpe-ratio
-        s.loc['Smart Sharpe Ratio'] = np.round(sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2)), 4)
+        s.loc['Smart Sharpe Ratio'] = round(sharpe * (1 + (skew / 6) * sharpe - (kurt / 24) * (sharpe ** 2)), 4)
 
         # Our Sortino mismatches `empyrical.sortino_ratio()` because they use arithmetic mean return
         _downside_returns = day_returns.clip(-np.inf, 0)
@@ -267,7 +267,7 @@ class Eq(bt.Analyzer):
         s.loc['Sortino Ratio'] = round(sortino_ratio, 4) if not np.isnan(sortino_ratio) else np.nan
 
         # s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
-        s.loc['VWR Ratio'] = np.round(calc_vwr(eq_days=day_eq.to_numpy()), 4)
+        s.loc['VWR Ratio'] = round(calc_vwr(eq_days=day_eq.to_numpy()), 4)
         max_dd = -np.nan_to_num(dd_df.max())
         s.loc['Calmar Ratio'] = round((annualized_return * 100) / abs(max_dd), 4) if max_dd != 0 else np.nan
 
