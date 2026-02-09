@@ -41,7 +41,7 @@ class Counter:
         return self.current
     
     def reset(self, start=1):
-        """Сбросить счетчик на новое значение"""
+        """Reset to new value"""
         self.counter = itertools.count(start)
         self.current = start - 1
     

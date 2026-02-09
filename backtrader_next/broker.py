@@ -21,8 +21,8 @@
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 from collections import defaultdict
 
-from backtrader_next.comminfo import CommInfoBase
-from backtrader_next.metabase import MetaParams
+from .comminfo import CommInfoBase
+from .metabase import MetaParams
 
 from .utils.py3 import with_metaclass, iteritems
 

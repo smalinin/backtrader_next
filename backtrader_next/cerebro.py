@@ -1052,12 +1052,16 @@ class Cerebro(with_metaclass(MetaParams, object)):
     def __getstate__(self):
         '''
         Used during optimization to prevent optimization result `runstrats`
-        from being pickled to subprocesses
+        and callbacks `optcbs` from being pickled to subprocesses.
+        Callbacks will be called in the main process after receiving results.
         '''
 
         rv = vars(self).copy()
         if 'runstrats' in rv:
             del(rv['runstrats'])
+        # Don't pickle callbacks - they will be called in main process
+        if 'optcbs' in rv:
+            del(rv['optcbs'])
         return rv
 
     def runstop(self):
