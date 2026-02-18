@@ -239,7 +239,7 @@ class Eq(bt.Analyzer):
         # Use abs() to handle negative equity ratios (losses) and apply sign back
         equity_ratio = equity[-1]/equity[0]
         cagr_value = (abs(equity_ratio) ** (1/num_years) - 1) * np.sign(equity_ratio) if equity_ratio != 0 else 0
-        s.loc['CAGR [%]'] = round(cagr_value, 4) * 100
+        s.loc['CAGR [%]'] = round(cagr_value * 100, 4)
 
         # Sharpe Ratio using arithmetic mean of returns to align with standard definition.
         # See: https://en.wikipedia.org/wiki/Sharpe_ratio
