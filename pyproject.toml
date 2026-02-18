@@ -1,6 +1,6 @@
 [project]
 name = "backtrader_next"
-version = "2.3.4"
+version = "2.3.5"
 description = "Live Trading and backtesting platform in Python"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
