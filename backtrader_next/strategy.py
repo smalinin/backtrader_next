@@ -27,6 +27,30 @@ import inspect
 import itertools
 import operator
 
+
+class _PicklableCount:
+    """Picklable drop-in replacement for itertools.count.
+
+    Python 3.14 removed the ability to pickle itertools.count objects.
+    This class replicates the same behaviour while being fully picklable.
+    """
+
+    def __init__(self, start=0, step=1):
+        self._n = start
+        self._step = step
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        n = self._n
+        self._n += self._step
+        return n
+
+    # Make picklable
+    def __reduce__(self):
+        return (self.__class__, (self._n, self._step))
+
 from numpy import dtype
 import pandas as pd
 
@@ -88,7 +112,7 @@ class MetaStrategy(StrategyBase.__class__):
 
         _obj.stats = _obj.observers = ItemCollection()
         _obj.analyzers = ItemCollection()
-        _obj._alnames = collections.defaultdict(itertools.count)
+        _obj._alnames = collections.defaultdict(_PicklableCount)
         _obj.writers = list()
 
         _obj._slave_analyzers = list()
