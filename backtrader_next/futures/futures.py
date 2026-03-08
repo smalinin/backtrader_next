@@ -69,11 +69,20 @@ class FuturesList():
     def switch_futures(self, strat: bt.Strategy = None) -> bool:
         if strat is not None:  # check if need to switch position
             pos_sz = 0
+            if self._next_fut is not None:
+                if not self._next_fut._data.is_on:
+                    raise ValueError(f"Next future {self._next_fut.name} is not active for switching, Check your date feed")
+                cur_dt = self._cur_fut._data.datetime.datetime(0)
+                next_dt = self._next_fut._data.datetime.datetime(0)
+                if cur_dt != next_dt:
+                    raise ValueError(f"Current future {self._cur_fut.name} and next future {self._next_fut.name} are not aligned on datetime for switching: {cur_dt} vs {next_dt}")
+
             if self._cur_fut is not None:
                 cur_data = strat.getdatabyname(self._cur_fut.name)
                 pos_sz = strat.getposition(data=cur_data).size
                 if pos_sz != 0:
                     strat.close(data=cur_data, size=pos_sz)  # Close current position
+                cur_data.is_end = True
             if self._next_fut is not None:  # Open position on next future
                 next_data = strat.getdatabyname(self._next_fut.name)
                 if pos_sz > 0:
@@ -97,6 +106,7 @@ class FuturesList():
             self._next_dt = None
         return True
 
+    # Check if it is time for start iteration on next future
     def check_date(self, dt: datetime.datetime) -> None:
         if self._next_dt is None:
             return False
