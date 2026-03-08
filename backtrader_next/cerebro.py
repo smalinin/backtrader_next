@@ -287,7 +287,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self._signal_concurrent = False
         self._signal_accumulate = False
 
-        self._dataid = itertools.count(1)
+        self._dataid = 0
 
         self._broker = broker or BackBroker()
         self._broker.cerebro = self
@@ -734,7 +734,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
         if name is not None:
             data._name = name
 
-        data._id = next(self._dataid)
+        self._dataid += 1
+        data._id = self._dataid
         data.setenvironment(self)
 
         self.datas.append(data)
@@ -1221,10 +1222,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
         return self.runstrats
 
     def _init_stcount(self):
-        self.stcount = itertools.count(0)
+        self.stcount = 0
 
     def _next_stid(self):
-        return next(self.stcount)
+        self.stcount += 1
+        return self.stcount
 
     def runstrategies(self, iterstrat, predata=False):
         '''
@@ -1612,7 +1614,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         next_writers = self._next_writers
         cheat_on_open = self.p.cheat_on_open
 
-        dts = [d.advance_peek() for d in datas]
+        dts = [d.advance_peek() if d.is_on else math.inf  for d in datas]
         ndatas = len(datas)
         while True:
             # Check next incoming date in the datas
@@ -1623,6 +1625,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
             for i in range(ndatas):
                 if datas[i].is_on and dts[i] <= dt0:
                     datas[i].advance()
+                if datas[i].is_end:
+                    dts[i] = math.inf
+                    datas[i].is_on = False
 
             # Timers before broker (cheat)
             check_timers(runstrats, dt0, cheat=True)
@@ -1642,14 +1647,14 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
             # Strategy once-post and writer updates
             for strat in runstrats:
-                strat._oncepost(dt0, dts)  ##//?? <<<----
+                strat._oncepost(dt0, dts)
                 if self._event_stop:  # stop if requested
                     return
 
                 next_writers(runstrats)
 
             for i in range(ndatas):
-                if datas[i].is_on and dts[i] <= dt0:
+                if datas[i].is_on and (dts[i] <= dt0 or dts[i] == math.inf):
                     dts[i] = datas[i].advance_peek()
 
 
