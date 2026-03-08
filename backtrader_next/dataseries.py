@@ -64,6 +64,7 @@ class DataSeries(LineSeries):
     _compression = 1
     _timeframe = TimeFrame.Days
     _is_on = True
+    _is_end = False
 
     Close, Low, High, Open, Volume, OpenInterest, DateTime = range(7)
 
@@ -76,6 +77,14 @@ class DataSeries(LineSeries):
     @is_on.setter
     def is_on(self, value: bool):
         self._is_on = value
+
+    @property
+    def is_end(self) -> bool:
+        return self._is_end
+
+    @is_end.setter
+    def is_end(self, value: bool):
+        self._is_end = value
 
     @property
     def name(self):
@@ -156,7 +165,6 @@ class SimpleFilterWrapper(object):
 
         return False
 
-##?? checkme dropme
 class _Bar(AutoOrderedDict):
     '''
     This class is a placeholder for the values of the standard lines of a

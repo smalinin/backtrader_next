@@ -160,6 +160,14 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase, dataseries.OHLCDateT
     replaying = 0
 
     _started = False
+    
+    tick_close = None
+    tick_low = None
+    tick_high = None
+    tick_open = None
+    tick_volume = None
+    tick_last = None
+
 
     def _start_finish(self):
         # A live feed (for example) may have learnt something about the
