@@ -33,18 +33,19 @@ from .utils import AutoOrderedDict
 
 class Counter:
     def __init__(self, start=1):
-        self.counter = itertools.count(start)
+        self._next = start
         self.current = start - 1
-    
+
     def next(self):
-        self.current = next(self.counter)
+        self.current = self._next
+        self._next += 1
         return self.current
-    
+
     def reset(self, start=1):
         """Reset to new value"""
-        self.counter = itertools.count(start)
+        self._next = start
         self.current = start - 1
-    
+
     def get_current(self):
         return self.current
     
