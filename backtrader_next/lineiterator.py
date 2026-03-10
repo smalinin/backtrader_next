@@ -52,6 +52,14 @@ class MetaLineIterator(LineSeries.__class__):
         lastarg = 0
         _obj.datas = []
         for arg in args:
+            # Check if this is an Aurora data feed by checking module name
+            # Aurora data feeds are from aurora.feed module and should NOT be wrapped
+            if hasattr(arg, '__class__') and 'aurora' in getattr(arg.__class__, '__module__', ''):
+                # This is an Aurora data feed - use it directly
+                _obj.datas.append(arg)
+                mindatas = max(0, mindatas - 1)
+                lastarg += 1
+                continue
             if isinstance(arg, LineRoot):
                 _obj.datas.append(LineSeriesMaker(arg))
 

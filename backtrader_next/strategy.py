@@ -95,8 +95,16 @@ class MetaStrategy(StrategyBase.__class__):
         _obj, args, kwargs = super(MetaStrategy, cls).donew(*args, **kwargs)
 
         # Find the owner and store it
-        _obj.env = _obj.cerebro = cerebro = findowner(_obj, bt.Cerebro)
-        _obj._id = cerebro._next_stid()
+        # Support Aurora: check _cerebro kwarg first, then findowner
+        cerebro = kwargs.pop('_cerebro', None)
+        if cerebro is None:
+            cerebro = findowner(_obj, bt.Cerebro)
+        
+        _obj.env = _obj.cerebro = cerebro
+        if cerebro is not None:
+            _obj._id = cerebro._next_stid()
+        else:
+            _obj._id = 0  # Fallback if no cerebro found
 
         return _obj, args, kwargs
 
@@ -569,9 +577,11 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         self._tradehistoryon = onoff
 
     def clear(self):
-        self._orders.extend(self._orderspending)
-        self._orderspending = list()
-        self._tradespending = list()
+        if self._orderspending:
+            self._orders.extend(self._orderspending)
+            self._orderspending.clear()
+        if self._tradespending:
+            self._tradespending.clear()
 
     def _addnotification(self, order, quicknotify=False):
         if not order.p.simulated:
@@ -661,14 +671,16 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         for order in procorders:
             if order.exectype != order.Historical or order.histnotify:
                 self.notify_order(order)
-            for analyzer in itertools.chain(self.analyzers,
-                                            self._slave_analyzers):
+            for analyzer in self.analyzers:
+                analyzer._notify_order(order)
+            for analyzer in self._slave_analyzers:
                 analyzer._notify_order(order)
 
         for trade in proctrades:
             self.notify_trade(trade)
-            for analyzer in itertools.chain(self.analyzers,
-                                            self._slave_analyzers):
+            for analyzer in self.analyzers:
+                analyzer._notify_trade(trade)
+            for analyzer in self._slave_analyzers:
                 analyzer._notify_trade(trade)
 
         if qorders:
@@ -681,7 +693,10 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
         self.notify_cashvalue(cash, value)
         self.notify_fund(cash, value, fundvalue, fundshares)
-        for analyzer in itertools.chain(self.analyzers, self._slave_analyzers):
+        for analyzer in self.analyzers:
+            analyzer._notify_cashvalue(cash, value)
+            analyzer._notify_fund(cash, value, fundvalue, fundshares)
+        for analyzer in self._slave_analyzers:
             analyzer._notify_cashvalue(cash, value)
             analyzer._notify_fund(cash, value, fundvalue, fundshares)
 

@@ -279,6 +279,8 @@ class BackBroker(bt.BrokerBase):
         self._fundval = self.p.fundstartval
         self._fundshares = self.p.cash / self._fundval
         self._cash_addition = collections.deque()
+        self._open_data = set()  # set of data feeds with non-zero positions
+        self._comminfo_cache = {}  # per-data comminfo cache (immutable during run)
 
     def get_notification(self):
         try:
@@ -287,6 +289,17 @@ class BackBroker(bt.BrokerBase):
             pass
 
         return None
+
+    def getcommissioninfo(self, data):
+        '''Cached comminfo lookup — avoids repeated dict lookups on the hot path.
+        The commission info is fixed during a run, so we cache per-data-object.
+        '''
+        try:
+            return self._comminfo_cache[data]
+        except KeyError:
+            ci = self.comminfo.get(data._name, self.comminfo[None])
+            self._comminfo_cache[data] = ci
+            return ci
 
     def set_fundmode(self, fundmode, fundstartval=None):
         '''Set the actual fundmode (True or False)
@@ -429,17 +442,45 @@ class BackBroker(bt.BrokerBase):
             self._fundshares += c / self._fundval
             self.cash += c
 
-        for data in datas or self.positions:
-            comminfo = self.getcommissioninfo(data)
-            position = self.positions[data]
-            # use valuesize:  returns raw value, rather than negative adj val
-            if not self.p.shortcash:
-                dvalue = comminfo.getvalue(position, data.close[0])
-            else:
-                dvalue = comminfo.getvaluesize(position.size, data.close[0])
+        # Fast-path: no open positions
+        if not datas and not self._open_data:
+            self._value = self.cash
+            self._fundval = self._value / self._fundshares
+            self._valuemkt = 0.0
+            self._valuelever = self.cash
+            self._valuemktlever = 0.0
+            self._leverage = 1.0
+            self._unrealized = 0.0
+            return self._value
 
-            dunrealized = comminfo.profitandloss(position.size, position.price,
-                                                 data.close[0])
+        for data in datas or self._open_data:
+            comminfo = self.getcommissioninfo(data)
+            position = self.positions.get(data)
+            if not position:
+                if datas and len(datas) == 1:
+                    return 0.0
+                continue
+
+            price = data.close[0]
+
+            # Fast path: non-stocklike, fixed margin, leverage=1.0 (most common for futures)
+            # Only active when called from broker.next() (datas=None), not from getvalue(data)
+            # Inlines getvaluesize(), profitandloss(), get_leverage() — saves 3 function calls/bar
+            if comminfo._fast_value_path and not datas:
+                dvalue = abs(position.size) * comminfo._vp_margin
+                dunrealized = position.size * (price - position.price) * comminfo._vp_mult
+                pos_value += dvalue
+                pos_value_unlever += dvalue   # leverage=1.0 → pos_value_unlever == pos_value
+                unrealized += dunrealized
+                continue
+
+            # General path: stocklike, automargin, or leverage != 1.0
+            if not self.p.shortcash:
+                dvalue = comminfo.getvalue(position, price)
+            else:
+                dvalue = comminfo.getvaluesize(position.size, price)
+
+            dunrealized = comminfo.profitandloss(position.size, position.price, price)
             if datas and len(datas) == 1:
                 if lever and dvalue > 0:
                     dvalue -= dunrealized
@@ -820,6 +861,11 @@ class BackBroker(bt.BrokerBase):
 
             # do a real position update if something was executed
             position.update(execsize, price, data.datetime.datetime())
+            # track open positions for fast-path in _get_value / broker.next
+            if position.size:
+                self._open_data.add(data)
+            else:
+                self._open_data.discard(data)
 
             if closed and self.p.int2pnl:  # Assign accumulated interest data
                 closedcomm += self.d_credit.pop(data, 0.0)
@@ -1191,60 +1237,81 @@ class BackBroker(bt.BrokerBase):
         while self._toactivate:
             self._toactivate.popleft().activate()
 
-        if self.p.checksubmit:
+        # Skip check_submitted when queue is empty (saves function call on most bars)
+        if self.p.checksubmit and self.submitted:
             self.check_submitted()
 
-        # Discount any cash for positions hold
+        # Combined credit interest + futures cash adjustment in single pass
+        # (single getcommissioninfo() call per open position instead of 2)
         credit = 0.0
-        for data, pos in self.positions.items():
+        for data in self._open_data:
+            pos = self.positions.get(data)
             if pos:
                 comminfo = self.getcommissioninfo(data)
-                dt0 = data.datetime.datetime()
-                dcredit = comminfo.get_credit_interest(data, pos, dt0)
-                self.d_credit[data] += dcredit
-                credit += dcredit
-                pos.datetime = dt0  # mark last credit operation
+                # Credit interest: skip entirely if no interest configured
+                # (avoids num2date() call for short positions when interest=0)
+                if (comminfo.p.interest or comminfo.p.interest_long) and \
+                        not (pos.size > 0 and not comminfo.p.interest_long):
+                    dt0 = data.datetime.datetime()
+                    dcredit = comminfo.get_credit_interest(data, pos, dt0)
+                    self.d_credit[data] += dcredit
+                    credit += dcredit
+                    pos.datetime = dt0
+                # Futures cash adjustment: inline for common fast path (non-stocklike, fixed margin)
+                close = data.close[0]
+                if comminfo._fast_value_path:
+                    self.cash += pos.size * (close - pos.adjbase) * comminfo._vp_mult
+                else:
+                    self.cash += comminfo.cashadjust(pos.size, pos.adjbase, close)
+                pos.adjbase = close
 
         self.cash -= credit
 
-        self._process_order_history()
+        # Only process order history if there are user-submitted historical orders
+        if self._userhist:
+            self._process_order_history()
 
-        # Iterate once over all elements of the pending queue
-        self.pending.append(None)
-        while True:
-            order = self.pending.popleft()
-            if order is None:
-                break
+        # Iterate pending queue only when non-empty (saves 2 deque ops per bar)
+        if self.pending:
+            self.pending.append(None)
+            while True:
+                order = self.pending.popleft()
+                if order is None:
+                    break
 
-            if order.expire():
-                self.notify(order)
-                self._ococheck(order)
-                self._bracketize(order, cancel=True)
+                if order.expire():
+                    self.notify(order)
+                    self._ococheck(order)
+                    self._bracketize(order, cancel=True)
 
-            elif not order.active():
-                self.pending.append(order)  # cannot yet be processed
+                elif not order.active():
+                    self.pending.append(order)  # cannot yet be processed
 
-            else:
-                self._try_exec(order)
-                if order.alive():
-                    self.pending.append(order)
+                else:
+                    self._try_exec(order)
+                    if order.alive():
+                        self.pending.append(order)
 
-                elif order.status == Order.Completed:
-                    # a bracket parent order may have been executed
-                    self._bracketize(order)
+                    elif order.status == Order.Completed:
+                        # a bracket parent order may have been executed
+                        self._bracketize(order)
 
-        # Operations have been executed ... adjust cash end of bar
-        for data, pos in self.positions.items():
-            # futures change cash every bar
-            if pos:
-                comminfo = self.getcommissioninfo(data)
-                self.cash += comminfo.cashadjust(pos.size,
-                                                 pos.adjbase,
-                                                 data.close[0])
-                # record the last adjustment price
-                pos.adjbase = data.close[0]
-
-        self._get_value()  # update value
+        # Update portfolio value — inline fast-path to avoid function call overhead
+        if self._open_data:
+            self._get_value()
+        else:
+            # No open positions: value equals cash (avoid _get_value() call overhead)
+            while self._cash_addition:
+                c = self._cash_addition.popleft()
+                self._fundshares += c / self._fundval
+                self.cash += c
+            self._value = self.cash
+            self._fundval = self._value / self._fundshares
+            self._valuemkt = 0.0
+            self._valuelever = self.cash
+            self._valuemktlever = 0.0
+            self._leverage = 1.0
+            self._unrealized = 0.0
 
 
 # Alias

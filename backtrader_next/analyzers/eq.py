@@ -119,9 +119,13 @@ class Eq(bt.Analyzer):
 
         if self.p.cash:
             pvals.append(self._cash)
-            # pvals.append(self.strategy.broker.get_cash())
 
-        self.rets[self.strategy.datetime.datetime()] = pvals
+        # Use raw float datetime key (avoid num2date per bar).
+        # _dt0 is set by AuroraStrategy._oncepost; fall back for non-Aurora.
+        dt_key = getattr(self.strategy, '_dt0', None)
+        if dt_key is None:
+            dt_key = self.strategy.datetime.datetime()
+        self.rets[dt_key] = pvals
 
     def notify_order(self, order):
         if order.status not in [Order.Partial, Order.Completed]:
@@ -132,7 +136,11 @@ class Eq(bt.Analyzer):
     def gen_eq(self) -> 'DataFrame':
         if self.eq_df is not None:
             return self.eq_df
-        data = [[k] + v[-2:] for k, v in iteritems(self.rets)]
+        from backtrader_next.utils.dateintern import num2date as _n2d
+        # Keys in self.rets may be float (Aurora fast-path) or datetime (fallback)
+        def _to_dt(k):
+            return _n2d(k) if isinstance(k, (int, float)) else k
+        data = [[_to_dt(k)] + v[-2:] for k, v in iteritems(self.rets)]
         eq_df = df.from_records(data, index=self.rets_header[0], columns=self.rets_header)
         eq_df.index = pd.to_datetime(eq_df.index)
         #TODO eq_df.index = eq_df.index.tz_localize('UTC')

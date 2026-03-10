@@ -158,6 +158,18 @@ class CommInfoBase(with_metaclass(MetaParams)):
 
         self._creditrate = self.p.interest / 365.0
 
+        # Fast-path flag for _get_value() hot path:
+        # True when non-stocklike, fixed margin (no automargin), leverage=1.0
+        # Allows inlining getvaluesize/profitandloss/get_leverage calls
+        self._fast_value_path = (
+            not self._stocklike and
+            not self.p.automargin and
+            self.p.leverage == 1.0
+        )
+        # Pre-cache margin and mult for fast path value computation
+        self._vp_margin = float(self.p.margin) if self.p.margin else 1.0
+        self._vp_mult = float(self.p.mult)
+
     @property
     def margin(self):
         return self.p.margin

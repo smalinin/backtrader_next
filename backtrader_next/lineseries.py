@@ -605,6 +605,16 @@ class LineSeriesStub(LineSeries):
         self.owner = self._owner = line._owner
         self._minperiod = line._minperiod
         self.slave = slave
+    
+    @property
+    def is_on(self):
+        """Forward is_on attribute from owner if it exists (for Aurora data feeds)"""
+        return getattr(self._owner, 'is_on', True)
+
+    @property
+    def is_end(self):
+        """Forward is_on attribute from owner if it exists (for Aurora data feeds)"""
+        return getattr(self._owner, 'is_end', True)
 
     # Only execute the operations below if the object is not a slave
     def forward(self, value=NAN, size=1):

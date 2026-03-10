@@ -1410,11 +1410,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
         notification to the strategy
         '''
         self._broker.next()
-        while True:
-            order = self._broker.get_notification()
-            if order is None:
-                break
-
+        # Direct deque access — avoids get_notification() call + IndexError per bar
+        notifs = self._broker.notifs
+        while notifs:
+            order = notifs.popleft()
             owner = order.owner
             if owner is None:
                 owner = self.runningstrats[0]  # default
@@ -1625,9 +1624,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
             for i in range(ndatas):
                 if datas[i].is_on and dts[i] <= dt0:
                     datas[i].advance()
-                if datas[i].is_end:
-                    dts[i] = math.inf
-                    datas[i].is_on = False
+                    # is_end only checked after advance() — avoids N×bars unnecessary lookups
+                    if datas[i].is_end:
+                        dts[i] = math.inf
+                        datas[i].is_on = False
 
             # Timers before broker (cheat)
             check_timers(runstrats, dt0, cheat=True)
