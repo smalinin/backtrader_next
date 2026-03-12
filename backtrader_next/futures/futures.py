@@ -35,6 +35,12 @@ class FuturesList():
 
     def __init__(self, switch_time: datetime.time = datetime.time(10, 0, 0)):
         self._switch_time = switch_time
+        self._futures = []
+        self._names = []
+        self._pos = -1
+        self._cur_fut = None
+        self._next_fut = None
+        self._next_dt = None
 
     @property
     def names(self) -> list[str]:
@@ -63,6 +69,7 @@ class FuturesList():
         first = True
         for f in self._futures:
             f._data.is_on = False if not first else True
+            f._data.is_end = False  # reset between optimization runs
             first = False
         return self.switch_futures()
 

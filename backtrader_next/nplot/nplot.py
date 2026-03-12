@@ -161,8 +161,8 @@ class Plot(with_metaclass(MetaParams, object)):
 
             self.pinf.reset()
 
-            # xd - list of datetimes
-            xd = data.datetime.plot()
+            # xd - list of datetimes (sliced to same range as plotrange data)
+            xd = data.datetime.plotrange(self.pinf.xstart, self.pinf.xend)
             xdates = [num2date(value) for value in xd]
 
             # plot ind above data
