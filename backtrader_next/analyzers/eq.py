@@ -89,18 +89,27 @@ class Eq(bt.Analyzer):
         self.eq_df = None
         self.trades_df = None
         self.orders_df = None
+        self._trade_sizes = {}
+        self._last_exec_price = {}  # data._name -> last executed price
 
     def notify_trade(self, trade):
-        if trade.justopened:
-            pass
+        if not trade.isclosed:
+            # Track peak absolute size (handles scaling-in: multiple buys before one sell)
+            prev = self._trade_sizes.get(trade.ref, 0)
+            self._trade_sizes[trade.ref] = max(prev, abs(trade.size))
 
         elif trade.status == trade.Closed:
-            #self.trades_op.append([])  remove
-            return_pct = (1 if trade.long else -1) * (trade.data.open[0] / trade.price - 1)
+            max_size = self._trade_sizes.pop(trade.ref, None)
+            if max_size and trade.price:
+                price_close = self._last_exec_price.get(trade.data._name, 0.0)
+                return_pct = (price_close / trade.price - 1) * (1 if trade.long else -1)
+            else:
+                return_pct = 0.0
+                price_close = 0.0
             size = (1 if trade.long else -1)
             self.trades.append([trade.ref, trade.data._name, trade.tradeid, trade.commission,
                                 trade.pnl, trade.pnlcomm, return_pct, trade.open_datetime(),
-                                trade.close_datetime(), size, trade.barlen, trade.price, trade.data.open[0]])
+                                trade.close_datetime(), size, trade.barlen, trade.price, price_close])
 
 
     def notify_fund(self, cash, value, fundvalue, shares):
@@ -130,6 +139,7 @@ class Eq(bt.Analyzer):
     def notify_order(self, order):
         if order.status not in [Order.Partial, Order.Completed]:
             return  # It's not an execution
+        self._last_exec_price[order.data._name] = order.executed.price
         self.orders.append([order.ref, order.data._name, order.data.datetime.datetime(),
                             order.ordtype, order.executed.price, order.executed.size])
 
@@ -247,7 +257,7 @@ class Eq(bt.Analyzer):
         # Use abs() to handle negative equity ratios (losses) and apply sign back
         equity_ratio = equity[-1]/equity[0]
         cagr_value = (abs(equity_ratio) ** (1/num_years) - 1) * np.sign(equity_ratio) if num_years>0 and equity_ratio != 0 else 0
-        s.loc['CAGR [%]'] = round(cagr_value, 4) * 100
+        s.loc['CAGR [%]'] = round(cagr_value * 100, 4)
 
         # Sharpe Ratio using arithmetic mean of returns to align with standard definition.
         # See: https://en.wikipedia.org/wiki/Sharpe_ratio
