@@ -73,7 +73,48 @@ class FuturesList():
             first = False
         return self.switch_futures()
 
+    def is_switch_datetime(self, cur_dt: datetime.datetime) -> bool:
+        """
+        Determines whether the given cur_dt datetime meets the conditions to
+        switch futures, based on the current future's end date and the
+        configured switch time. Returns True if a switch should occur, otherwise
+        False.
+        """
+        if self._next_dt is None:
+            return False
+        cur_fut = self._cur_fut
+        if cur_dt.date() >= cur_fut.end and cur_dt.time() >= self._switch_time:
+            return True
+        return False
+
+    def try_switch(self, cur_dt: datetime.datetime, strat: bt.Strategy = None) -> bool:
+        """
+        Checks if it's time to switch futures based on the current datetime and the configured switch time.
+        If it's time to switch, it performs the switch and returns True. Otherwise, it returns False.
+
+        Args:
+            cur_dt (datetime.datetime): The current datetime to check against the switch conditions.
+            strat (bt.Strategy, optional): The strategy instance to use for switching positions. Defaults to None.
+
+        Returns:
+            bool: True if a switch occurred, False otherwise.
+        """
+        if self.is_switch_datetime(cur_dt):
+            return self.switch_futures(strat)
+        return False
+
+
     def switch_futures(self, strat: bt.Strategy = None) -> bool:
+        """
+        Switch to next future, optionally closing current position on strat if provided 
+        and opening position on next future with same size and direction if there is an open position on current future.
+
+        Args:
+            strat (bt.Strategy, optional): The strategy instance to use for switching positions. Defaults to None.
+
+        Returns:
+            bool: True if switch was successful, False if there are no more futures to switch to.
+        """
         if strat is not None:  # check if need to switch position
             pos_sz = 0
             if self._next_fut is not None:
@@ -113,12 +154,20 @@ class FuturesList():
             self._next_dt = None
         return True
 
-    # Check if it is time for start iteration on next future
+
     def check_date(self, dt: datetime.datetime) -> None:
+        """
+        Checks if the given datetime meets the conditions to switch to the next future. If the conditions are met, it activates the next future's data feed.
+
+        Args:
+            dt (datetime.datetime): The current datetime to check against the switch conditions.
+
+        Returns:
+            bool: True if the next future's data feed was activated, False otherwise.
+        """
         if self._next_dt is None:
-            return False
+            return
         if not self._next_fut._data.is_on and dt >= self._next_dt:
             self._next_fut._data.is_on = True
-
 
 
