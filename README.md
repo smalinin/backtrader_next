@@ -26,7 +26,7 @@ Changes:
  - Added performance statistics in both text format (similar to Backtesting.py) and HTML format (similar to Quantstats).
  - Improved support for switching between futures (for testing, etc.).
  - Added new indicators implemented with Numba.
- - Improved performance — now it runs about 2–3× slower than Backtesting.py in `runonce=True` mode with `PandasData`.
+ - Improved performance — now it runs about 4.5× faster than Backtrader in `runonce=True` mode with `PandasData`.
  - Detailed results
  - Interactive visualizations
 
@@ -40,9 +40,9 @@ Performance comparison using the [perf_compare](https://github.com/smalinin/back
 
 | Framework | Execution Time | Relative Speed |
 |---|---|---|
-| Backtesting | 2.95 sec | 14.3x faster than Backtrader |
-| Backtrader-next | 12.33 sec | 3.4x faster than Backtrader |
 | Backtrader | 42.25 sec | Baseline |
+| Backtrader-next | 9.40 sec | 4.5x faster than Backtrader |
+| Backtesting | 2.98 sec | 14.2x faster than Backtrader |
 
 
 ## Here a snippet of a Simple Moving Average CrossOver.
@@ -80,19 +80,13 @@ class SmaCross(bt.Strategy):
         if order.status in [order.Submitted, order.Accepted]:  # Order is submitted/accepted
             return  # Do nothing until the order is completed
 
-        # if order.status in [order.Completed]:  # Order is completed
-        #     if order.isbuy():  # Buy order
-        #         pass
-        #     elif order.issell():  # Sell order 
-        #         pass
-
-        elif order.status in [order.Canceled]:  # Canceled, Margin, Rejected
+        elif order.status in [order.Canceled]:
             print('Order was Canceled', self.data.datetime.datetime(0))
 
-        elif order.status in [order.Margin]:  # Canceled, Margin, Rejected
+        elif order.status in [order.Margin]:
             print('Order was Margin ', self.data.datetime.datetime(0))
 
-        elif order.status in [order.Rejected]:  # Canceled, Margin, Rejected
+        elif order.status in [order.Rejected]:
             print('Order was Rejected', self.data.datetime.datetime(0))
 
         self.Order = None  # Reset order

@@ -63,8 +63,8 @@ uv run main_backtrader_next.py
 
 | Framework | Execution Time | Relative Speed |
 |---|---|---|
-| Backtesting | 2.95 sec | 14.3x faster than Backtrader |
-| Backtrader-next | 12.33 sec | 3.4x faster than Backtrader |
 | Backtrader | 42.25 sec | Baseline |
+| Backtrader-next | 9.40 sec | 4.5x faster than Backtrader |
+| Backtesting | 2.98 sec | 14.2x faster than Backtrader |
 
 
