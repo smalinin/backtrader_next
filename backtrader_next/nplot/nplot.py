@@ -94,6 +94,10 @@ class Plot(with_metaclass(MetaParams, object)):
             return
 
         strat_name = strategy.__class__.__name__
+        self.strat_params = pd.Series(dtype=object)
+        for key, val in strategy.p._getitems():
+            self.strat_params.loc[key]= val
+
         self.pinf = PInfo(self.p.scheme)
         self.performance = None
         self.performance_metrics = None
@@ -224,7 +228,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 if (size_prev < 0 and size > 0) or (size_prev > 0 and size < 0):
                     trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
                                     'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':f"{v['return_pct']:0.4f}    " , 'dateopen': format_datetime(v['dateopen']),
+                                    'return_pct':f"{v['return_pct']:0.3f}" , 'dateopen': format_datetime(v['dateopen']),
                                     'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
                                     'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
             else:
@@ -232,7 +236,7 @@ class Plot(with_metaclass(MetaParams, object)):
                 if not np.isnan(v['ref']):
                     trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
                                     'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':f"{v['return_pct']:0.4f}    ", 'dateopen': format_datetime(v['dateopen']),
+                                    'return_pct':f"{v['return_pct']:0.3f}" , 'dateopen': format_datetime(v['dateopen']),
                                     'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
                                     'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
                 else:
@@ -262,8 +266,10 @@ class Plot(with_metaclass(MetaParams, object)):
         chart.sync_charts()
         trades_lst = self.prepare_trades_list(data_name)
         chart.set_trades(lst=trades_lst)
+        chart.set_parameters_list(self.strat_params)
         if self.performance_metrics is not None:
-            self.chart.set_performance_metrics(self.performance_metrics, strat_name)
+            chart.set_performance_metrics(self.performance_metrics, strat_name)
+        
         chart.new_window()
         chart.legend(visible=True)
         chart.fit()

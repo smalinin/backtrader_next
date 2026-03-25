@@ -16,7 +16,7 @@ class Statistics(object):
     graphs = []
     tables = []
 
-    def report(self, name="Statistics", performance=None, show=True, filename="strat_quantstats.html", iplot=False):
+    def report(self, name="Statistics", performance=None, strats=None, show=True, filename="strat_quantstats.html", iplot=False):
         """Prepare statistics for the report"""
         if performance is None:
             exception = "No performance data provided"
@@ -24,6 +24,12 @@ class Statistics(object):
 
         df_eq = performance.gen_eq()
         df_stats = performance.compute_stats()
+
+        df_desc = pd.Series(dtype=object)
+        df_desc_name = strats[0].__class__.__name__ if strats and len(strats) == 1 else "Multiple Strategies"
+        if strats and len(strats) == 1:
+            for key, val in strats[0].p._getitems():
+                df_desc.loc[key]= val
 
         annual_trading_days = float(365 if df_eq.index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
@@ -97,6 +103,21 @@ class Statistics(object):
         self.graphs.append(fig)
 
 
+        ### Params ####
+        if strats and len(strats) == 1:
+            fig_params = go.Figure(data=[go.Table(
+                header=dict(values=["Parameter", "Value"], fill_color='lightgray'),
+                cells=dict(values=[df_desc.index.tolist(), [str(val) for val in df_desc.values]],
+            	    align=["left", "right"],
+            	    font=dict(size=13),
+            	    height=26,
+            	    line_color='darkgray',
+            	    fill_color=[["#f0f0f0" if i % 2 == 0 else "rgb(244,255,255)" for i in range(len(df_desc))]],
+                ),
+            )])
+            fig_params.update_layout(title=f"Strategy [{df_desc_name}] Parameters", margin=dict(l=20, r=10, t=30, b=10), height=300, font=dict(size=12))
+            self.tables.append(fig_params)
+
         ### Metrics ####
         fig_metrics = go.Figure(data=[go.Table(
             header=dict(values=["Metric", "Value"], fill_color='lightgray'),
@@ -108,7 +129,7 @@ class Statistics(object):
             	fill_color=[["#f0f0f0" if i % 2 == 0 else "rgb(244,255,255)" for i in range(len(df_stats))]],
             ),
         )])
-        fig_metrics.update_layout(title="Performance Metrics", margin=dict(l=20, r=10, t=30, b=10), height=980, font=dict(size=12))
+        fig_metrics.update_layout(title="Performance Metrics", margin=dict(l=20, r=10, t=30, b=10), height=1040, font=dict(size=12))
         self.tables.append(fig_metrics)
 
 

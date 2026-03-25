@@ -1038,7 +1038,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
             iplot = True
 
         report_gen = nplot.Statistics()
-        report_gen.report(name=name, performance=eq, show=show, filename=filename, iplot=iplot)
+        report_gen.report(name=name, performance=eq, strats=flat_runstrats, show=show, filename=filename, iplot=iplot)
 
 
     def __call__(self, iterstrat):

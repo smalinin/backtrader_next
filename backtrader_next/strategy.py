@@ -208,7 +208,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         desc = pd.Series(dtype=object)
         desc.loc["Strategy"] = self.__class__.__name__
         for key, val in self.p._getitems():
-            desc.loc[key]= self.p._get(key)
+            desc.loc[key]= val
         return desc
 
     @property
