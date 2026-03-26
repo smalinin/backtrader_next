@@ -29,7 +29,7 @@ class Statistics(object):
         df_desc_name = strats[0].__class__.__name__ if strats and len(strats) == 1 else "Multiple Strategies"
         if strats and len(strats) == 1:
             for key, val in strats[0].p._getitems():
-                df_desc.loc[key]= val
+                df_desc.loc[key]= strats[0].p._get(key)
 
         annual_trading_days = float(365 if df_eq.index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)

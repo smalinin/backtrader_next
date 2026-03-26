@@ -96,7 +96,7 @@ class Plot(with_metaclass(MetaParams, object)):
         strat_name = strategy.__class__.__name__
         self.strat_params = pd.Series(dtype=object)
         for key, val in strategy.p._getitems():
-            self.strat_params.loc[key]= val
+            self.strat_params.loc[key]= strategy.p._get(key)
 
         self.pinf = PInfo(self.p.scheme)
         self.performance = None
