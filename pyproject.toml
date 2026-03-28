@@ -22,6 +22,7 @@ dependencies = [
     "pandas>=2.2.3",
     "plotly>=6.1.2",
     "tqdm",
+    "sambo[all]",
 ]
 
 [project.urls]
