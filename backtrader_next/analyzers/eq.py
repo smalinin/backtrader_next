@@ -383,7 +383,7 @@ def geometric_mean(returns: pd.Series) -> float:
 #    calc VariabilityWeightedReturn
 #    See:
 #      - https://www.crystalbull.com/sharpe-ratio-better-with-log-returns/
-def calc_vwr(eq_days: np.array, sdev_max=2.0, tau=0.20, annual_trading_days=252.0) -> float:
+def calc_vwr(eq_days: np.array, sdev_max=0.2, tau=2.0, annual_trading_days=252.0) -> float:
     eq = eq_days #.to_numpy()
     eq_0 = np.roll(eq, 1)  # shift()
 

@@ -99,8 +99,8 @@ class VWR(TimeFrameAnalyzerBase):
 
     params = (
         ('tann', None),
-        ('tau', 0.20),
-        ('sdev_max', 2.0),
+        ('tau', 2.0),
+        ('sdev_max', 0.2),
         ('fund', None),
     )
 
