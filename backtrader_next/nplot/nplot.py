@@ -6,6 +6,7 @@
 import bisect
 import collections
 import datetime
+import json
 from hashlib import file_digest
 import webbrowser
 from pathlib import Path
@@ -49,10 +50,15 @@ class PInfo(object):
 
 
 class Plot(with_metaclass(MetaParams, object)):
-    params = (('scheme', PlotScheme()),)
+    params = (
+        ('scheme', PlotScheme()),
+        ('trade_marker_tooltips', True),
+    )
 
     def __init__(self, **kwargs):
         for pname, pvalue in kwargs.items():
+            if pname == 'trade_marker_tooltips':
+                continue
             setattr(self.p.scheme, pname, pvalue)
         if not hasattr(self.p.scheme, 'locbg'):
             setattr(self.p.scheme, 'locbg', 'white')
@@ -262,6 +268,10 @@ class Plot(with_metaclass(MetaParams, object)):
 
     def show(self, chart, xdates, c_top, c_up, c_data, c_down, strat_name, data_name):
         chart.set_name(f"{strat_name}_{data_name}")
+        # HTMLChart_BN replaces the chart container when switching instruments.
+        # Dispose the prior view's tooltip listener and payload before drawing
+        # the next view, including when that next view has no trade markers.
+        chart.run_script('window.__btTradeTooltipCleanup?.();')
         self.draw_main(chart, xdates, c_top, c_up, c_data, c_down, data_name)
         chart.sync_charts()
         trades_lst = self.prepare_trades_list(data_name)
@@ -274,6 +284,209 @@ class Plot(with_metaclass(MetaParams, object)):
         chart.legend(visible=True)
         chart.fit()
         chart.price_scale(perm_width=100)
+
+    @staticmethod
+    def _tooltip_number(value, precision=4):
+        if value is None or pd.isna(value):
+            return '—'
+        return f'{float(value):,.{precision}f}'
+
+    @staticmethod
+    def _tooltip_text(value):
+        if value is None or pd.isna(value):
+            return '—'
+        return str(value)
+
+    def _add_trade_marker_tooltips(self, chart, marker_details):
+        """Attach an HTML hover card to the current Lightweight Charts pane."""
+        if not self.p.trade_marker_tooltips or not marker_details:
+            return
+
+        # The data is embedded in an inline script. Escape HTML-significant
+        # characters so values such as a data name cannot close that script.
+        details_json = json.dumps(marker_details, ensure_ascii=False).translate(str.maketrans({
+            '&': r'\u0026',
+            '<': r'\u003c',
+            '>': r'\u003e',
+            '\u2028': r'\u2028',
+            '\u2029': r'\u2029',
+        }))
+        chart.run_script(f'''
+        (() => {{
+            const handler = {chart.id};
+            const markerDetails = {details_json};
+            const markerDetailsByTime = new Map();
+            markerDetails.forEach(detail => {{
+                const key = String(detail.time);
+                const records = markerDetailsByTime.get(key) || [];
+                records.push(detail);
+                markerDetailsByTime.set(key, records);
+            }});
+            const tooltip = document.createElement('div');
+            tooltip.className = 'bt-trade-marker-tooltip';
+            Object.assign(tooltip.style, {{
+                position: 'absolute', display: 'none', pointerEvents: 'none', zIndex: '1000',
+                minWidth: '210px', maxWidth: '320px', padding: '10px 12px', borderRadius: '6px',
+                background: 'rgba(17, 26, 43, 0.96)', border: '1px solid #40506a',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)', color: '#e5edf7',
+                font: '12px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif',
+                lineHeight: '1.45', whiteSpace: 'nowrap'
+            }});
+            handler.div.appendChild(tooltip);
+
+            const hideTooltip = () => {{ tooltip.style.display = 'none'; }};
+            const tooltipPreferenceKey = 'backtrader-next.trade-marker-tooltips';
+            let tooltipToggle = document.getElementById('trade-tooltip-toggle');
+            if (!tooltipToggle) {{
+                tooltipToggle = document.createElement('button');
+                tooltipToggle.id = 'trade-tooltip-toggle';
+                tooltipToggle.type = 'button';
+                Object.assign(tooltipToggle.style, {{
+                    marginLeft: '8px', marginBottom: '8px', background: 'none',
+                    border: '1px solid var(--border2)', borderRadius: 'var(--radius)',
+                    color: 'var(--text-muted)', cursor: 'pointer', display: 'flex',
+                    alignItems: 'center', padding: '3px 10px', fontSize: '12px',
+                    fontFamily: 'var(--font)', fontWeight: '500', whiteSpace: 'nowrap'
+                }});
+                let enabled = true;
+                try {{
+                    const savedPreference = localStorage.getItem(tooltipPreferenceKey);
+                    if (savedPreference !== null) enabled = savedPreference === 'true';
+                }} catch (error) {{}}
+                const updateTooltipToggle = () => {{
+                    tooltipToggle.dataset.enabled = String(enabled);
+                    tooltipToggle.textContent = 'Trade tooltips: ' + (enabled ? 'On' : 'Off');
+                    tooltipToggle.title = enabled ? 'Disable trade tooltips' : 'Enable trade tooltips';
+                    tooltipToggle.setAttribute('aria-pressed', String(enabled));
+                }};
+                tooltipToggle.addEventListener('click', () => {{
+                    enabled = !enabled;
+                    try {{ localStorage.setItem(tooltipPreferenceKey, String(enabled)); }} catch (error) {{}}
+                    document.querySelectorAll('.bt-trade-marker-tooltip').forEach(element => {{
+                        element.style.display = 'none';
+                    }});
+                    updateTooltipToggle();
+                }});
+                updateTooltipToggle();
+                document.getElementById('theme-btn').insertAdjacentElement('afterend', tooltipToggle);
+            }}
+            const tooltipsEnabled = () => tooltipToggle.dataset.enabled === 'true';
+
+            window.__btApplyChartTheme = theme => {{
+                const colors = theme === 'dark'
+                    ? {{ background: 'rgb(18, 24, 38)', text: '#d8d9db', grid: '#444', label: 'rgb(46, 46, 46)' }}
+                    : {{ background: '#d8dce8', text: '#1a1d24', grid: '#b4baca', label: '#9aa1b5' }};
+                const handlers = Object.values(window).filter(value => value instanceof Lib.Handler && value.div.isConnected);
+                handlers.forEach(currentHandler => {{
+                    currentHandler.chart.applyOptions({{
+                        layout: {{ textColor: colors.text, background: {{ type: LightweightCharts.ColorType.Solid, color: colors.background }} }},
+                        grid: {{ vertLines: {{ color: colors.grid }}, horzLines: {{ color: colors.grid }} }},
+                        crosshair: {{
+                            vertLine: {{ labelBackgroundColor: colors.label }},
+                            horzLine: {{ labelBackgroundColor: colors.label }}
+                        }}
+                    }});
+                    currentHandler.legend.div.style.color = theme === 'light'
+                        ? '#000000'
+                        : currentHandler.legend.color;
+
+                    const seriesMarkers = currentHandler.seriesMarkers;
+                    if (seriesMarkers?.markers && seriesMarkers?.setMarkers) {{
+                        const themedMarkers = seriesMarkers.markers().map(marker => {{
+                            if (marker.color !== 'lightgreen' && marker.color !== '#006400') return marker;
+                            return {{ ...marker, color: theme === 'light' ? '#006400' : 'lightgreen' }};
+                        }});
+                        seriesMarkers.setMarkers(themedMarkers);
+                    }}
+                }});
+            }};
+            window.__btApplyChartTheme(document.documentElement.getAttribute('data-theme'));
+            if (!document.documentElement.dataset.tradeTooltipThemeListener) {{
+                document.documentElement.dataset.tradeTooltipThemeListener = 'true';
+                document.getElementById('theme-btn').addEventListener('click', () => {{
+                    window.__btApplyChartTheme(document.documentElement.getAttribute('data-theme'));
+                }});
+            }}
+
+            const appendRow = (parent, label, value) => {{
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.gap = '16px';
+                const key = document.createElement('span');
+                key.style.color = '#9eacc2';
+                key.textContent = label;
+                const content = document.createElement('span');
+                content.style.textAlign = 'right';
+                content.textContent = value;
+                row.append(key, content);
+                parent.appendChild(row);
+            }};
+            const showTooltip = (detail, point) => {{
+                tooltip.replaceChildren();
+                const title = document.createElement('div');
+                title.style.color = detail.color;
+                title.style.fontWeight = '700';
+                title.style.marginBottom = '6px';
+                title.textContent = detail.title;
+                tooltip.appendChild(title);
+                detail.fields.forEach(field => appendRow(tooltip, field.label, field.value));
+                tooltip.style.display = 'block';
+                const padding = 14;
+                const left = point.x + tooltip.offsetWidth + padding > handler.div.clientWidth
+                    ? Math.max(padding, point.x - tooltip.offsetWidth - padding)
+                    : point.x + padding;
+                const top = point.y + tooltip.offsetHeight + padding > handler.div.clientHeight
+                    ? Math.max(padding, point.y - tooltip.offsetHeight - padding)
+                    : point.y + padding;
+                tooltip.style.left = left + 'px';
+                tooltip.style.top = top + 'px';
+            }};
+
+            const onCrosshairMove = param => {{
+                if (!tooltipsEnabled()) {{
+                    hideTooltip();
+                    return;
+                }}
+                if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {{
+                    hideTooltip();
+                    return;
+                }}
+                const candle = param.seriesData.get(handler.series);
+                const candidates = markerDetailsByTime.get(String(Number(param.time))) || [];
+                if (!candle || !candidates.length) {{
+                    hideTooltip();
+                    return;
+                }}
+                let hovered = null;
+                let nearestDistance = Infinity;
+                for (const detail of candidates) {{
+                    const x = handler.chart.timeScale().timeToCoordinate(detail.time);
+                    let anchorPrice = detail.price;
+                    if (detail.position === 'below') anchorPrice = candle.low;
+                    if (detail.position === 'above') anchorPrice = candle.high;
+                    let y = handler.series.priceToCoordinate(anchorPrice);
+                    if (x === null || y === null) continue;
+                    if (detail.position === 'below') y += 14;
+                    if (detail.position === 'above') y -= 14;
+                    const distance = Math.hypot(param.point.x - x, param.point.y - y);
+                    if (distance < 18 && distance < nearestDistance) {{
+                        hovered = detail;
+                        nearestDistance = distance;
+                    }}
+                }}
+                hovered ? showTooltip(hovered, param.point) : hideTooltip();
+            }};
+            handler.chart.subscribeCrosshairMove(onCrosshairMove);
+            handler.div.addEventListener('mouseleave', hideTooltip);
+            window.__btTradeTooltipCleanup = () => {{
+                handler.chart.unsubscribeCrosshairMove(onCrosshairMove);
+                handler.div.removeEventListener('mouseleave', hideTooltip);
+                tooltip.remove();
+                window.__btTradeTooltipCleanup = undefined;
+            }};
+        }})();
+        ''')
 
     def draw_main(self, chart, xdates, c_top:{}, c_up, c_data, c_down, data_name):
 
@@ -368,7 +581,8 @@ class Plot(with_metaclass(MetaParams, object)):
             # orders = self.performance.gen_orders(data_name).groupby('o_datetime')['o_size'].sum().reset_index()
             orders = self.performance.gen_orders(data_name)
             markers = list()
-            for _, row in orders.iterrows():
+            marker_details = []
+            for index, row in orders.iterrows():
                 size = row['o_size']
                 price = row['o_price']
                 shape = 'arrow_up' if size>0 else 'arrow_down'
@@ -377,14 +591,52 @@ class Plot(with_metaclass(MetaParams, object)):
                 text = f'Buy @ {price}' if size>0 else f'Short @ {price}'
                 markers.append(dict(time=row['o_datetime'], position='below', shape=shape, color=color, text=text))
                 markers.append(dict(time=row['o_datetime'], position='atPriceMiddle', shape='circle', color=color, text='', price=price, size=0.6))
-            for _, row in trades.iterrows():
+                marker_details.append({
+                    'id': f'entry-{row["o_ref"]}-{index}',
+                    'time': float(subchart._single_datetime_format(row['o_datetime'])),
+                    'price': float(price),
+                    'position': 'below',
+                    'color': color,
+                    'title': 'Buy' if size > 0 else 'Short',
+                    'fields': [
+                        {'label': 'Instrument', 'value': data_name},
+                        {'label': 'Order Ref', 'value': self._tooltip_text(row['o_ref'])},
+                        {'label': 'Executed', 'value': format_datetime(row['o_datetime'])},
+                        {'label': 'Price', 'value': self._tooltip_number(price)},
+                        {'label': 'Quantity', 'value': self._tooltip_number(size)},
+                    ],
+                })
+            for index, row in trades.iterrows():
                 pnlcomm = row['pnlcomm']
                 shape = 'square'
                 color = 'yellow' if pnlcomm>0 else 'fuchsia'
                 text = '+Profit+' if pnlcomm>0 else '-Loss-'
                 markers.append(dict(time=row['dateclose'], position='above', shape=shape, color=color, text=text))
+                marker_details.append({
+                    'id': f'exit-{row["ref"]}-{index}',
+                    'time': float(subchart._single_datetime_format(row['dateclose'])),
+                    'price': float(row['priceclose']),
+                    'position': 'above',
+                    'color': color,
+                    'title': 'Profit' if pnlcomm > 0 else 'Loss',
+                    'fields': [
+                        {'label': 'Instrument', 'value': data_name},
+                        {'label': 'Trade Ref', 'value': self._tooltip_text(row['ref'])},
+                        {'label': 'Opened', 'value': format_datetime(row['dateopen'])},
+                        {'label': 'Closed', 'value': format_datetime(row['dateclose'])},
+                        {'label': 'Entry Price', 'value': self._tooltip_number(row['priceopen'])},
+                        {'label': 'Exit Price', 'value': self._tooltip_number(row['priceclose'])},
+                        {'label': 'Size', 'value': self._tooltip_number(row['size'])},
+                        {'label': 'Duration', 'value': self._tooltip_text(row['barlen']) + ' bars'},
+                        {'label': 'Gross P&L', 'value': self._tooltip_number(row['pnl'])},
+                        {'label': 'Commission', 'value': self._tooltip_number(row['commission'])},
+                        {'label': 'Net P&L', 'value': self._tooltip_number(pnlcomm)},
+                        {'label': 'Return', 'value': self._tooltip_number(row['return_pct'] * 100) + '%'},
+                    ],
+                })
             markers.sort(key=lambda m: m['time'])
             subchart.marker_list(markers)
+            self._add_trade_marker_tooltips(subchart, marker_details)
 
         i=0
         for lst in c_down:
@@ -683,5 +935,3 @@ class Plot(with_metaclass(MetaParams, object)):
                     self.dplots_down[key].append(x)
             else:
                 self.dplots_over[key].append(x)
-
-
