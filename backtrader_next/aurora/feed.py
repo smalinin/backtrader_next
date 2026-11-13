@@ -396,7 +396,7 @@ class AuroraDataBase:
             data[-1] # Previous bar
             data[1]  # Next bar (if preloaded)
         """
-        idx = self._idx - ago
+        idx = self._idx + ago
         
         if idx < 0 or idx >= self._length:
             # Return NaN array for out-of-bounds access

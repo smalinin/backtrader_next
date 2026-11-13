@@ -654,16 +654,14 @@ class Aurora(with_metaclass(MetaParams, object)):
         for strat in runstrats:
             strat.reset()
         
-        # OPTIMIZATION: Single data feed fast path (most common case)
-        if len(self.datas) == 1:
-            self._runonce_single(runstrats)
-            return
-        
-        # Multi-data feed path (original logic)
         with DataSynchronizer(self, runstrats) as synchronizer:
+            # Keep activation and cleanup rules shared by both loop variants.
+            if len(self.datas) == 1:
+                self._runonce_single(runstrats, synchronizer)
+                return
             self._runonce_multi(runstrats, synchronizer)
     
-    def _runonce_single(self, runstrats):
+    def _runonce_single(self, runstrats, synchronizer):
         '''
         Optimized loop for single data feed - most common case
         
@@ -685,9 +683,14 @@ class Aurora(with_metaclass(MetaParams, object)):
             strat_oncepost = strat._oncepost
             
             for _ in range(total_bars):
-                # Advance data
-                data.advance()
+                # Inactive feeds must not drive the clock or broker.
+                if not data.is_on or not data.advance():
+                    break
                 dt0 = data.lines.datetime[0]
+                synchronizer.datetime = dt0
+                # Match the multi-feed loop: process the final bar, then stop.
+                if data.is_end:
+                    data.is_on = False
                 
                 # Broker processing  
                 broker_next()
@@ -704,9 +707,12 @@ class Aurora(with_metaclass(MetaParams, object)):
         else:
             # Multiple strategies
             for _ in range(total_bars):
-                # Advance data
-                data.advance()
+                if not data.is_on or not data.advance():
+                    break
                 dt0 = data.lines.datetime[0]
+                synchronizer.datetime = dt0
+                if data.is_end:
+                    data.is_on = False
                 
                 # Broker processing
                 broker_next()
