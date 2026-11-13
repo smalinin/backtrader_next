@@ -254,7 +254,7 @@ class BackBroker(bt.BrokerBase):
         self._value = self.cash
         self._valuemkt = 0.0  # no open position
 
-        self._valuelever = 0.0  # no open position
+        self._valuelever = self.cash  # no open position
         self._valuemktlever = 0.0  # no open position
 
         self._leverage = 1.0  # initially nothing is open
@@ -387,6 +387,7 @@ class BackBroker(bt.BrokerBase):
         '''Sets the cash parameter (alias: ``setcash``)'''
         self.startingcash = self.cash = self.p.cash = cash
         self._value = cash
+        self._valuelever = cash
 
     setcash = set_cash
 
@@ -435,7 +436,8 @@ class BackBroker(bt.BrokerBase):
     getvalue = get_value
 
     def get_value_lever(self, datas=None, mkt=False):
-        return self.get_value(datas=datas, mkt=mkt)
+        '''Return get_value(..., lever=True), preserving data/market selection.'''
+        return self.get_value(datas=datas, mkt=mkt, lever=True)
 
     def _get_value(self, datas=None, lever=False, *, _mark_to_close=False):
         pos_value = 0.0
@@ -448,7 +450,7 @@ class BackBroker(bt.BrokerBase):
             self.cash += c
 
         # Fast-path: no open positions
-        if not datas and not self._open_data:
+        if not datas and not self._open_data and not self._fundhist:
             self._value = self.cash
             self._fundval = self._value / self._fundshares
             self._valuemkt = 0.0
@@ -531,18 +533,13 @@ class BackBroker(bt.BrokerBase):
             self.cash = fvalue - pos_value_unlever
             self._fundval = fval
             self._fundshares = fvalue / fval
-            lev = pos_value / (pos_value_unlever or 1.0)
-
-            # update the calculated values above to the historical values
-            pos_value_unlever = fvalue
-            pos_value = fvalue * lev
 
         self._valuemkt = pos_value_unlever
 
         self._valuelever = self.cash + pos_value
         self._valuemktlever = pos_value
 
-        self._leverage = pos_value / (pos_value_unlever or 1.0)
+        self._leverage = pos_value / (pos_value_unlever or 1.0) if self._open_data else 1.0
         self._unrealized = unrealized
 
         return self._value if not lever else self._valuelever
@@ -696,12 +693,19 @@ class BackBroker(bt.BrokerBase):
         self._userhist.append([o, oiter, notify])
 
     def set_fund_history(self, fund):
+        '''Use sorted (datetime, share_value, net_asset_value) records.
+
+        The first record supplies initial cash and fund values. Each broker
+        bar applies the latest record at or before the current feed clock,
+        even with no positions. The last applied values persist after history
+        is exhausted. Position market values remain separate from fund NAV.
+        '''
         # iterable with the following pro item
         # [datetime, share_value, net asset value]
         fiter = iter(fund)
         f = list(next(fiter))  # must not be empty
         self._fundhist = [f, fiter]
-        # self._fhistlast = f[1:]
+        self._fhistlast = f[1:]
 
         self.set_cash(float(f[2]))
 
@@ -1183,31 +1187,22 @@ class BackBroker(bt.BrokerBase):
         f, funds = fhist
         if not f:
             return self._fhistlast
+        # Feeds have advanced before broker.next(), unlike the strategy clock.
+        # Numeric UTC dates work in both preloaded and streaming engines and
+        # include a final bar even when its feed has just been deactivated.
+        now = max((data.datetime[0] for data in self.cerebro.datas if len(data)), default=None)
+        if now is None:
+            return self._fhistlast
 
-        dt = f[0]  # date/datetime instance
-        if isinstance(dt, string_types):
-            dtfmt = '%Y-%m-%d'
-            if 'T' in dt:
-                dtfmt += 'T%H:%M:%S'
-                if '.' in dt:
-                    dtfmt += '.%f'
-            dt = datetime.datetime.strptime(dt, dtfmt)
-            f[0] = dt  # update value
-
-        elif isinstance(dt, datetime.datetime):
-            pass
-        elif isinstance(dt, datetime.date):
-            dt = datetime.datetime(year=dt.year, month=dt.month, day=dt.day)
-            f[0] = dt  # Update the value
-
-        # Synchronization with the strategy is not possible because the broker
-        # is called before the strategy advances. The 2 lines below would do it
-        # if possible
-        # st0 = self.cerebro.runningstrats[0]
-        # if dt <= st0.datetime.datetime():
-        if dt <= self.cerebro._dtmaster:
+        while f:
+            dt = f[0]
+            if isinstance(dt, string_types):
+                dt = datetime.datetime.fromisoformat(dt)
+                f[0] = dt
+            if bt.date2num(dt) > now:
+                break
             self._fhistlast = f[1:]
-            fhist[0] = list(next(funds, []))
+            f = fhist[0] = list(next(funds, []))
 
         return self._fhistlast
 
@@ -1343,7 +1338,7 @@ class BackBroker(bt.BrokerBase):
             pos.adjbase = close
 
         # Update portfolio value — inline fast-path to avoid function call overhead
-        if self._open_data:
+        if self._open_data or self._fundhist:
             self._get_value()
         else:
             # No open positions: value equals cash (avoid _get_value() call overhead)

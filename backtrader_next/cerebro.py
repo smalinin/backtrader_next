@@ -322,12 +322,12 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
     def set_fund_history(self, fund):
         '''
-        Add a history of orders to be directly executed in the broker for
-        performance evaluation
+        Add historical fund share values and net asset values to the broker
+        for performance evaluation, including bars with no open positions.
 
           - ``fund``: is an iterable (ex: list, tuple, iterator, generator)
             in which each element will be also an iterable (with length) with
-            the following sub-elements (2 formats are possible)
+            the following sub-elements:
 
             ``[datetime, share_value, net asset value]``
 

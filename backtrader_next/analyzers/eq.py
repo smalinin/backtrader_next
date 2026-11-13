@@ -83,6 +83,11 @@ class Eq(bt.Analyzer):
         Returns order execution history as a pandas DataFrame. Each row holds
         a new fill's price and signed quantity, not cumulative order totals.
         Partial fills of the same order share o_ref.
+
+    Generated frames are cached snapshots. New equity observations, closed
+    trades and fills invalidate the corresponding cache, so reading results
+    during run() does not freeze the final report. Execution dates use the
+    broker's actual fill times, including fills at a previous bar's close.
     '''
 
     params = (
@@ -121,6 +126,7 @@ class Eq(bt.Analyzer):
                                 trade.pnl, trade.pnlcomm, trade.return_pct, trade.open_datetime(),
                                 trade.close_datetime(), size, trade.barlen, trade.priceopen,
                                 trade.priceclose, trade.entry_notional, trade.return_net_pct])
+            self.trades_df = None
 
 
     def notify_fund(self, cash, value, fundvalue, shares):
@@ -148,16 +154,17 @@ class Eq(bt.Analyzer):
         if dt_key is None:
             dt_key = self.strategy.datetime.datetime()
         self.rets[dt_key] = pvals
+        self.eq_df = None
 
     def notify_order(self, order):
         if order.status not in [Order.Partial, Order.Completed]:
             return  # It's not an execution
-        dt = order.data.datetime.datetime()
         for fill in order.executed.iterpending():
             if fill is None:
                 break
-            self.orders.append([order.ref, order.data._name, dt,
+            self.orders.append([order.ref, order.data._name, order.data.num2date(fill.dt),
                                 order.ordtype, fill.price, fill.size])
+            self.orders_df = None
 
     def gen_eq(self) -> 'DataFrame':
         if self.eq_df is not None:

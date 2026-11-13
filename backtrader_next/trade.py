@@ -293,6 +293,8 @@ class Trade(object):
         if not size:
             return  # empty update, skip all other calculations
 
+        execution_dt = self.data.datetime[0] if dt is None else dt
+
         if self._initial_entry_value:
             self.entry_notional += abs(self._initial_entry_value * comminfo.p.mult)
             self._initial_entry_value = 0.0
@@ -309,7 +311,7 @@ class Trade(object):
 
         if self.justopened:
             self.baropen = len(self.data)
-            self.dtopen = 0.0 if order.p.simulated else self.data.datetime[0]
+            self.dtopen = 0.0 if order.p.simulated else execution_dt
             self.long = self.size > 0
 
         # Any size means the trade was opened
@@ -325,7 +327,7 @@ class Trade(object):
         if self.isclosed:
             self.isopen = False
             self.barclose = len(self.data)
-            self.dtclose = self.data.datetime[0]
+            self.dtclose = execution_dt
 
             self.status = self.Closed
         elif self.isopen:
@@ -354,14 +356,13 @@ class Trade(object):
         self.value = comminfo.getvaluesize(self.size, self.price)
 
         # Keep compact fills independently of the optional, heavier trade history.
-        execution_dt = self.data.datetime[0] if dt is None else dt
         self._execution_history.append(TradeExecution(
             execution_dt, size, price, self.size, self.price, self.pnl,
             comminfo.p.mult, timing, getattr(order, 'ref', None)))
 
         # Update the history if needed
         if self.historyon:
-            dt0 = self.data.datetime[0] if not order.p.simulated else 0.0
+            dt0 = execution_dt if not order.p.simulated else 0.0
             histentry = TradeHistory(
                 self.status, dt0, self.barlen,
                 self.size, self.price, self.value,
