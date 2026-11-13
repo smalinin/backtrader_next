@@ -20,6 +20,7 @@ import datetime
 import sys
 import multiprocessing
 import pandas as pd
+from .. import optimization as _optimization
 from tqdm import tqdm
 
 try:  # For new Python versions
@@ -116,6 +117,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         
         # Analyzers, Observers, and Sizers
         self.analyzers = list()
+        _optimization.reset_diagnostics(self)
         self.observers = list()
         self.sizers = dict()  # {idx or None: (sizercls, args, kwargs)}
         
@@ -906,6 +908,7 @@ class Aurora(with_metaclass(MetaParams, object)):
                  return_heatmap=False,
                  return_optimization=False,
                  maxcpus=1,
+                 on_error='raise',
                  **params):
         '''
         Optimize strategy parameters (SAMBO-compatible API)
@@ -961,6 +964,12 @@ class Aurora(with_metaclass(MetaParams, object)):
                 - None: Use all available CPU cores
                 Note: SAMBO optimization cannot be parallelized due to sequential nature
             
+            on_error: 'raise' (default) stops at the first exception and preserves
+                its type, traceback and parameters in exception.optimization_error.
+                'skip' continues and records failures in self.optimization_errors.
+                Applies to backtests and constraint callbacks, not invalid search settings.
+                KeyboardInterrupt and SystemExit are never treated as failed trials.
+
             **params: Parameter ranges as (min, max) tuples, discrete values, or fixed values
                 For SAMBO: pass (min, max) tuples for optimized params: n1=(10, 100)
                     Fixed (non-optimized) values also supported: stop_loss=50
@@ -973,6 +982,17 @@ class Aurora(with_metaclass(MetaParams, object)):
                 - heatmap: pd.DataFrame with all parameter combinations (if return_heatmap=True)
                 - optimize_result: optimization internals (if return_optimization=True, SAMBO only)
         
+        Diagnostics:
+            optimization_errors: List of dicts with params, strategy, stage,
+                error_type, exception_module, message and traceback.
+            optimization_summary: Counts of successful, failed, constraint_rejected
+                and invalid_metrics. Reset for every optimize() call.
+            Best statistics include Optimization Successful Runs / Failed Runs;
+                best_stats.attrs and heatmap.attrs contain optimization_summary.
+            Completed runs with NaN/inf objective metrics count as successful,
+                but cannot win. An empty usable result raises OptimizationError.
+            SAMBO's max_tries includes rejected constraint evaluations.
+
         Example (Random Search):
             >>> stats, heatmap = aurora.optimize(
             ...     MyStrategy,
@@ -1025,557 +1045,32 @@ class Aurora(with_metaclass(MetaParams, object)):
             ...     return_heatmap=True
             ... )
         '''
-        # Validate inputs
-        if not params:
-            raise ValueError("At least one parameter must be specified for optimization")
-        
-        method = method.lower()
-        if method not in ('grid', 'sambo', 'random'):
-            raise ValueError(f"Unknown optimization method: {method}. Use 'grid', 'sambo', or 'random'")
-        
-        # For SAMBO, check if library is available
-        if method == 'sambo':
-            try:
-                import sambo
-            except ImportError:
-                raise ImportError(
-                    "SAMBO library not installed. Install it with: pip install sambo\n"
-                    "Or use method='grid' for grid search optimization"
-                )
-        
-        # Dispatch to appropriate optimization method
-        if method == 'sambo':
-            return self._optimize_sambo(
-                strategy=strategy,
-                maximize=maximize,
-                constraint=constraint,
-                max_tries=max_tries,
-                random_state=random_state,
-                return_heatmap=return_heatmap,
-                return_optimization=return_optimization,
-                params=params
-            )
-        elif method == 'random':
-            return self._optimize_random(
-                strategy=strategy,
-                maximize=maximize,
-                constraint=constraint,
-                max_tries=max_tries,
-                random_state=random_state,
-                return_heatmap=return_heatmap,
-                maxcpus=maxcpus,
-                params=params
-            )
-        else:  # grid
-            return self._optimize_grid(
-                strategy=strategy,
-                maximize=maximize,
-                constraint=constraint,
-                return_heatmap=return_heatmap,
-                maxcpus=maxcpus,
-                params=params
-            )
-    
+        return _optimization.optimize(
+            self, strategy, method, maximize, constraint, max_tries, random_state,
+            return_heatmap, return_optimization, maxcpus, on_error, params)
+
     def _run_single_combination(self, args):
-        '''Helper function to run a single parameter combination (for multiprocessing)'''
-        strategy, param_dict = args
-        
-        try:
-            # Create fresh Aurora instance for this run
-            aurora_run = Aurora()
-            aurora_run.broker.setcash(self.broker.getvalue())
-            
-            # Copy commission settings
-            if hasattr(self.broker, 'comminfo'):
-                for name, comminfo in self.broker.comminfo.items():
-                    aurora_run.broker.addcommissioninfo(comminfo, name=name)
-            
-            # Copy sizer
-            if self.sizers:
-                for idx, (sizercls, sizerargs, sizerkwargs) in self.sizers.items():
-                    if idx is None:
-                        aurora_run.addsizer(sizercls, *sizerargs, **sizerkwargs)
-                    else:
-                        aurora_run.addsizer_byidx(idx, sizercls, *sizerargs, **sizerkwargs)
-            
-            # Copy data feeds
-            for data in self.datas:
-                aurora_run.adddata(data)
-            
-            # Copy analyzers
-            for ancls, anargs, ankwargs in self.analyzers:
-                aurora_run.addanalyzer(ancls, *anargs, **ankwargs)
-            
-            # Copy observers  
-            for multi, obscls, obargs, obkwargs in self.observers:
-                aurora_run.addobserver(obscls, *obargs, **obkwargs)
-            
-            # Add strategy with current parameters
-            aurora_run.addstrategy(strategy, **param_dict)
-            
-            # Run
-            runstrats = aurora_run.run()
-            if runstrats:
-                strat = runstrats[0]
-                stats_dict = strat.statistics.to_dict() if hasattr(strat.statistics, 'to_dict') else {}
-                
-                # Add strategy parameters to stats,
-                # excluding large/unpicklable objects (e.g. FuturesList data feeds)
-                _EXCLUDED_MODULES = ('backtrader_next',)
-                serializable_params = {}
-                for k, v in param_dict.items():
-                    mod = getattr(type(v), '__module__', '') or ''
-                    if any(mod.startswith(m) for m in _EXCLUDED_MODULES):
-                        continue  # skip backtrader objects
-                    serializable_params[k] = v
-                stats_dict.update(serializable_params)
-                
-                return stats_dict
-        except Exception as e:
-            # Silently skip failed combinations in multiprocessing
-            return None
-    
+        return _optimization.run_single_combination(self, Aurora, args)
+
     def _optimize_random(self, strategy, maximize, constraint, max_tries,
-                        random_state, return_heatmap, maxcpus, params):
-        '''Random search (Monte Carlo) optimization'''
-        import numpy as np
-        
-        # Set random seed for reproducibility
-        if random_state is not None:
-            np.random.seed(random_state)
-        
-        # Extract parameter bounds
-        param_names = list(params.keys())
-        param_ranges = []
-        
-        for key, value in params.items():
-            if isinstance(value, tuple) and len(value) == 2:
-                # (min, max) tuple - continuous range
-                param_ranges.append(('continuous', value[0], value[1]))
-            elif hasattr(value, '__iter__') and not isinstance(value, str):
-                # Iterable - discrete values
-                param_ranges.append(('discrete', list(value)))
-            else:
-                # Fixed value - not randomized
-                param_ranges.append(('value', value))
-        
-        # Generate random combinations
-        max_tries = max_tries or 100
-        combinations = []
-        attempts = 0
-        max_attempts = max_tries * 100  # Prevent infinite loop
-        
-        class TempParams:
-            pass
-        
-        seen = set()
+                         random_state, return_heatmap, maxcpus, params,
+                         on_error='raise'):
+        return _optimization.optimize_random(
+            self, strategy, maximize, constraint, max_tries, random_state,
+            return_heatmap, maxcpus, params, on_error)
 
-        while len(combinations) < max_tries and attempts < max_attempts:
-            attempts += 1
-            
-            # Generate random values for each parameter
-            combo = []
-            for param_type, *param_info in param_ranges:
-                if param_type == 'continuous':
-                    min_val, max_val = param_info
-                    # Random value in continuous range
-                    if isinstance(min_val, int) and isinstance(max_val, int):
-                        val = np.random.randint(min_val, max_val + 1)
-                    else:
-                        val = np.random.uniform(min_val, max_val)
-                elif param_type == 'discrete':
-                    values = param_info[0]
-                    val = np.random.choice(values)
-                else:  # value
-                    val = param_info[0]
-                combo.append(val)
-            
-            combo_tuple = tuple(combo)
+    def _optimize_grid(self, strategy, maximize, constraint, return_heatmap,
+                       maxcpus, params, on_error='raise'):
+        return _optimization.optimize_grid(
+            self, strategy, maximize, constraint, return_heatmap, maxcpus,
+            params, on_error)
 
-            # Skip duplicate combinations
-            if combo_tuple in seen:
-                continue
-
-            # Check constraint
-            if constraint:
-                temp = TempParams()
-                for name, val in zip(param_names, combo_tuple):
-                    setattr(temp, name, val)
-                try:
-                    if not constraint(temp):
-                        continue
-                except:
-                    continue
-            
-            seen.add(combo_tuple)
-            combinations.append(combo_tuple)
-        
-        if not combinations:
-            raise ValueError(
-                "Could not generate any valid parameter combinations. "
-                "Check your constraints and parameter ranges."
-            )
-        
-        # Run each combination (with optional multiprocessing)
-        from tqdm import tqdm
-        
-        all_stats = []
-        
-        # Prepare arguments for each combination
-        param_dicts = [{name: val for name, val in zip(param_names, combo)} for combo in combinations]
-        run_args = [(strategy, param_dict) for param_dict in param_dicts]
-        
-        # Check if multiprocessing should be used
-        use_multiprocessing = maxcpus != 1 and len(combinations) > 1
-        
-        if use_multiprocessing:
-            # Parallel execution with multiprocessing
-            with multiprocessing.Pool(maxcpus or None) as pool:
-                results = list(tqdm(
-                    pool.imap(self._run_single_combination, run_args),
-                    total=len(run_args),
-                    desc="Random Search (parallel)..."
-                ))
-                all_stats = [r for r in results if r is not None]
-        else:
-            # Sequential execution
-            for args in tqdm(run_args, desc="Random Search..."):
-                result = self._run_single_combination(args)
-                if result is not None:
-                    all_stats.append(result)
-        
-        # Find best result
-        df = pd.DataFrame(all_stats)
-        
-        # Check if multi-objective optimization
-        if isinstance(maximize, dict):
-            # Multi-objective optimization
-            df = self._normalize_metrics(df, maximize)
-            df['_multiobjective_score'] = self._calculate_multiobjective_score(df, maximize)
-            best_idx = df['_multiobjective_score'].idxmax()
-            best_stats = df.loc[best_idx]
-        else:
-            # Single-objective optimization
-            if maximize not in df.columns:
-                raise ValueError(f"Metric '{maximize}' not found. Available: {list(df.columns)}")
-            
-            # Always maximize: negative metrics (e.g. Drawdown < 0) benefit from idxmax() too
-            # (max of negative = closest to 0 = smallest absolute drawdown = best)
-            best_idx = df[maximize].idxmax()
-            best_stats = df.loc[best_idx]
-        
-        # Return results
-        ret = (best_stats,)
-        if return_heatmap:
-            ret += (df,)
-        
-        return ret[0] if len(ret) == 1 else ret
-    
-    def _optimize_grid(self, strategy, maximize, constraint, return_heatmap, maxcpus, params):
-        '''Grid search optimization'''
-        # Convert params to iterables
-        param_names = list(params.keys())
-        param_values = []
-        
-        for key, value in params.items():
-            if isinstance(value, tuple) and len(value) == 2 and not isinstance(value[0], str):
-                # Check that it's actually a (min, max) numeric range, not a fixed 2-element value
-                try:
-                    min_val, max_val = value
-                    _ = min_val + max_val  # will raise TypeError for non-numeric
-                    # (min, max) tuple - create reasonable grid
-                    step = (max_val - min_val) / 10
-                    if isinstance(min_val, int) and isinstance(max_val, int):
-                        step = max(1, int(step))
-                        value = range(min_val, max_val + 1, step)
-                    else:
-                        import numpy as np
-                        value = np.linspace(min_val, max_val, 10)
-                except TypeError:
-                    pass  # treat as fixed value / iterable below
-            
-            # Fixed scalar value: iterize wraps it into a 1-element tuple → single grid point
-            param_values.append(self.iterize([value])[0])
-        
-        # Generate all combinations
-        import itertools
-        combinations = list(itertools.product(*param_values))
-        
-        # Apply constraint if provided
-        if constraint:
-            # Create temp params object for constraint checking
-            class TempParams:
-                pass
-            
-            filtered_combinations = []
-            for combo in combinations:
-                temp = TempParams()
-                for name, val in zip(param_names, combo):
-                    setattr(temp, name, val)
-                try:
-                    if constraint(temp):
-                        filtered_combinations.append(combo)
-                except:
-                    pass  # Skip invalid combinations
-            combinations = filtered_combinations
-        
-        # Run each combination (with optional multiprocessing)
-        from tqdm import tqdm
-        
-        all_stats = []
-        
-        # Prepare arguments for each combination
-        param_dicts = [{name: val for name, val in zip(param_names, combo)} for combo in combinations]
-        run_args = [(strategy, param_dict) for param_dict in param_dicts]
-        
-        # Check if multiprocessing should be used
-        use_multiprocessing = maxcpus != 1 and len(combinations) > 1
-        
-        if use_multiprocessing:
-            # Parallel execution with multiprocessing
-            with multiprocessing.Pool(maxcpus or None) as pool:
-                results = list(tqdm(
-                    pool.imap(self._run_single_combination, run_args),
-                    total=len(run_args),
-                    desc="Grid Search (parallel)..."
-                ))
-                all_stats = [r for r in results if r is not None]
-        else:
-            # Sequential execution
-            for args in tqdm(run_args, desc="Optimization..."):
-                result = self._run_single_combination(args)
-                if result is not None:
-                    all_stats.append(result)
-        
-        # Find best result
-        df = pd.DataFrame(all_stats)
-        
-        # Check if multi-objective optimization
-        if isinstance(maximize, dict):
-            # Multi-objective optimization
-            df = self._normalize_metrics(df, maximize)
-            df['_multiobjective_score'] = self._calculate_multiobjective_score(df, maximize)
-            best_idx = df['_multiobjective_score'].idxmax()
-            best_stats = df.loc[best_idx]
-        else:
-            # Single-objective optimization
-            if maximize not in df.columns:
-                raise ValueError(f"Metric '{maximize}' not found. Available: {list(df.columns)}")
-            
-            # Always maximize: negative metrics (e.g. Drawdown < 0) benefit from idxmax() too
-            # (max of negative = closest to 0 = smallest absolute drawdown = best)
-            best_idx = df[maximize].idxmax()
-            best_stats = df.loc[best_idx]
-        
-        # Return results
-        ret = (best_stats,)
-        if return_heatmap:
-            ret += (df,)
-        
-        return ret[0] if len(ret) == 1 else ret
-    
     def _optimize_sambo(self, strategy, maximize, constraint, max_tries,
-                       random_state, return_heatmap, return_optimization, params):
-        '''SAMBO Bayesian optimization'''
-        import sambo
-        import numpy as np
-        
-        # Separate optimizable params (min, max) from fixed-value params
-        opt_param_names = []   # names of params passed to SAMBO
-        fixed_params = {}      # name -> fixed value (not optimized)
-        bounds = []
-        param_types = {}       # Track if parameter should be int or float
-
-        for key, value in params.items():
-            if isinstance(value, tuple) and len(value) == 2:
-                # (min, max) tuple - optimizable by SAMBO
-                min_val, max_val = value
-                param_types[key] = 'int' if (isinstance(min_val, int) and isinstance(max_val, int)) else 'float'
-                opt_param_names.append(key)
-                bounds.append(value)
-            else:
-                # Scalar or other constant - fixed, not optimized
-                fixed_params[key] = value
-
-        if not opt_param_names:
-            raise ValueError(
-                "For method='sambo', at least one parameter must be a (min, max) tuple. "
-                "All parameters appear to be fixed values."
-            )
-
-        bounds = np.array(bounds)
-        
-        # Define objective function
-        results_cache = []
-        # Use moderate penalty to avoid KDE numerical issues
-        penalty_base = -1000.0
-        
-        def objective(param_array):
-            '''Objective function for SAMBO'''
-            # Convert optimized params to dict with proper types
-            param_dict = {}
-            for i, name in enumerate(opt_param_names):
-                val = param_array[i] if len(param_array.shape) == 1 else param_array[0, i]
-                # Convert to int if parameter bounds were integers
-                if param_types[name] == 'int':
-                    param_dict[name] = int(round(float(val)))
-                else:
-                    param_dict[name] = float(val)
-            # Merge fixed params
-            param_dict.update(fixed_params)
-            
-            # Check constraint
-            if constraint:
-                class TempParams:
-                    pass
-                temp = TempParams()
-                for name, val in param_dict.items():
-                    setattr(temp, name, val)
-                try:
-                    if not constraint(temp):
-                        # Add small random variance to avoid identical penalties
-                        return penalty_base + np.random.uniform(-10.0, 10.0)
-                except:
-                    return penalty_base + np.random.uniform(-10.0, 10.0)
-            
-            # Run single combination using unified method
-            try:
-                stats_dict = self._run_single_combination((strategy, param_dict))
-                if not stats_dict:
-                    return penalty_base + np.random.uniform(-10.0, 10.0)
-                
-                # Extract metric - handle both single and multi-objective
-                if isinstance(maximize, dict):
-                    # Multi-objective: use first metric for SAMBO optimization
-                    primary_metric = list(maximize.keys())[0]
-                    if primary_metric not in stats_dict:
-                        return penalty_base + np.random.uniform(-10.0, 10.0)
-                    metric_value = stats_dict[primary_metric]
-                    metric_direction = maximize[primary_metric]
-                    metric_direction = metric_direction[0] if isinstance(metric_direction, tuple) else metric_direction
-                else:
-                    # Single-objective
-                    if maximize not in stats_dict:
-                        return penalty_base + np.random.uniform(-10.0, 10.0)
-                    metric_value = stats_dict[maximize]
-                    metric_direction = 'max'
-                
-                # Handle nan/inf - robust checking
-                try:
-                    metric_float = float(metric_value)
-                    if not np.isfinite(metric_float):
-                        return penalty_base + np.random.uniform(-10.0, 10.0)
-                    metric_value = metric_float
-                except (ValueError, TypeError, OverflowError):
-                    return penalty_base + np.random.uniform(-10.0, 10.0)
-                
-                # Cache results (already contains params from _run_single_combination)
-                results_cache.append(stats_dict)
-                
-                # SAMBO minimizes the objective:
-                # - 'max' metrics (incl. negative Drawdown): negate so SAMBO finds the max
-                # - 'min' metrics: keep as-is
-                if metric_direction != 'min':
-                    metric_value = -metric_value
-                
-                # Final check for finite value
-                if not np.isfinite(metric_value):
-                    return penalty_base + np.random.uniform(-10.0, 10.0)
-                
-                return float(metric_value)
-                
-            except Exception as e:
-                print(f"Error in backtest: {e}")
-                return penalty_base + np.random.uniform(-10.0, 10.0)
-        
-        # Run SAMBO optimization
-        max_tries = max_tries or 50
-        
-        print(f"Running SAMBO optimization with {max_tries} iterations...")
-        
-        # Wrap objective to update progress bar on each call
-        progress = tqdm(total=max_tries, desc="SAMBO Optimization")
-        
-        def objective_with_progress(x):
-            result = objective(x)
-            progress.update(1)
-            return result
-        
-        # Define constraint function for SAMBO
-        constraint_func = None
-        if constraint:
-            def constraint_func(x):
-                # Convert optimized params to dict with proper types
-                param_dict = {}
-                for i, name in enumerate(opt_param_names):
-                    val = x[i] if len(x.shape) == 1 else x[0, i]
-                    # Convert to int if parameter bounds were integers
-                    if param_types[name] == 'int':
-                        param_dict[name] = int(round(float(val)))
-                    else:
-                        param_dict[name] = float(val)
-                # Merge fixed params
-                param_dict.update(fixed_params)
-
-                # Check constraint
-                class TempParams:
-                    pass
-                temp = TempParams()
-                for name, val in param_dict.items():
-                    setattr(temp, name, val)
-                try:
-                    return constraint(temp)
-                except:
-                    return False
-        
-        # Run SAMBO optimization using minimize function
-        result = sambo.minimize(
-            fun=objective_with_progress,
-            bounds=bounds,
-            constraints=constraint_func,
-            max_iter=max_tries,
-            method='sceua',
-            rng=random_state
-        )
-        
-        progress.close()
-        
-        # Extract best parameters from result
-        best_params = result.x
-        best_value = result.fun
-        
-        # Find best result from cache
-        if results_cache:
-            df_cache = pd.DataFrame(results_cache)
-            
-            # Check if multi-objective optimization
-            if isinstance(maximize, dict):
-                # Multi-objective optimization - recalculate scores with proper normalization
-                df_cache = self._normalize_metrics(df_cache, maximize)
-                df_cache['_multiobjective_score'] = self._calculate_multiobjective_score(df_cache, maximize)
-                best_idx = df_cache['_multiobjective_score'].idxmax()
-                best_stats = df_cache.loc[best_idx]
-            else:
-                # Single-objective optimization
-                # Always maximize: negative metrics (e.g. Drawdown < 0) use idxmax() too
-                # (max of negative = closest to 0 = smallest absolute drawdown = best)
-                best_idx = df_cache[maximize].idxmax()
-                best_stats = df_cache.loc[best_idx]
-        else:
-            # No valid results - return empty Series
-            best_stats = pd.Series({'error': 'No valid results'})
-        
-        # Return results
-        ret = (best_stats,)
-        
-        if return_heatmap:
-            df = pd.DataFrame(results_cache)
-            ret += (df,)
-        
-        if return_optimization:
-            ret += (result,)
-        
-        return ret[0] if len(ret) == 1 else ret
+                        random_state, return_heatmap, return_optimization,
+                        params, on_error='raise'):
+        return _optimization.optimize_sambo(
+            self, strategy, maximize, constraint, max_tries, random_state,
+            return_heatmap, return_optimization, params, on_error)
 
     def plot(self, iplot=False, start=None, end=None,
              width=1000, height=900, show=True, filename=None, **kwargs):

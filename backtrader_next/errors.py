@@ -22,7 +22,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 
-__all__ = ['BacktraderError', 'StrategySkipError']
+__all__ = ['BacktraderError', 'StrategySkipError', 'OptimizationError']
 
 
 class BacktraderError(Exception):
@@ -33,6 +33,11 @@ class BacktraderError(Exception):
 class StrategySkipError(BacktraderError):
     '''Requests the platform to skip this strategy for backtesting. To be
     raised during the initialization (``__init__``) phase of the instance'''
+    pass
+
+
+class OptimizationError(BacktraderError):
+    '''A parameter search produced no usable backtest results.'''
     pass
 
 
