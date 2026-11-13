@@ -1288,7 +1288,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
             return_heatmap, return_optimization, maxcpus, on_error, params)
 
     def _run_single_combination(self, args):
-        return _optimization.run_single_combination(self, Cerebro, args)
+        return _optimization.run_single_combination(self, type(self), args)
 
     def _optimize_random(self, strategy, maximize, constraint, max_tries,
                          random_state, return_heatmap, maxcpus, params,

@@ -20,6 +20,7 @@
 ###############################################################################
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 from collections import defaultdict
+from copy import deepcopy
 
 from .comminfo import CommInfoBase
 from .metabase import MetaParams
@@ -67,6 +68,24 @@ class BrokerBase(with_metaclass(MetaBroker, object)):
 
     def stop(self):
         pass
+
+    def clone(self):
+        '''Create a fresh broker with the same configuration.
+
+        Preserve the concrete class, declared parameters, commission schemes
+        and configured information. Positions, orders and current cash are
+        initialized by the constructor; the configured starting cash is kept.
+        Mutable settings, including callable filler objects, are copied.
+
+        Subclasses requiring additional constructor arguments or configuration
+        outside ``params`` can override this method.
+        '''
+        configuration = deepcopy((self.p._getkwargs(), self.comminfo, self.info))
+        params, comminfo, info = configuration
+        broker = type(self)(**params)
+        broker.comminfo = comminfo
+        broker.info = info
+        return broker
 
     def add_info(self, strat_name:str, **kwargs):
         '''Add the keys, values of kwargs to the internal info dictionary to

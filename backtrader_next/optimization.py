@@ -6,6 +6,7 @@
 """Shared parameter search and failure reporting for Cerebro and Aurora."""
 
 from dataclasses import dataclass
+from copy import deepcopy
 from functools import partial
 import itertools
 import multiprocessing
@@ -90,16 +91,26 @@ def _cleanup_failed_run(child, error):
                     type(cleanup_error).__name__, cleanup_error))
 
 
+def _copy_engine_configuration(engine, child):
+    # Keep references to the actual feeds and rebind timer owners to the trial.
+    memo = {id(engine): child, id(engine.broker): child.broker}
+    memo.update((id(data), data) for data in engine.datas)
+    for name in ('writers', 'indicators', 'signals', '_signal_strat',
+                 '_signal_concurrent', '_signal_accumulate', '_tradingcal',
+                 '_pretimers', '_ohistory', '_fhistory'):
+        if hasattr(engine, name):
+            setattr(child, name, deepcopy(getattr(engine, name), memo))
+
+
 def run_single_combination(engine, engine_class, args):
     """Run a trial and release resources on failure; the caller reports errors."""
     strategy, params = args
     child = None
     completed = False
     try:
-        child = engine_class()
-        child.broker.setcash(engine.broker.getvalue())
-        for name, comminfo in getattr(engine.broker, 'comminfo', {}).items():
-            child.broker.addcommissioninfo(comminfo, name=name)
+        child = engine_class(broker=engine.broker.clone(),
+                             **deepcopy(engine.p._getkwargs()))
+        _copy_engine_configuration(engine, child)
         for idx, (sizercls, sizerargs, sizerkwargs) in engine.sizers.items():
             if idx is None:
                 child.addsizer(sizercls, *sizerargs, **sizerkwargs)
@@ -109,6 +120,12 @@ def run_single_combination(engine, engine_class, args):
             child.adddata(data)
         for ancls, anargs, ankwargs in engine.analyzers:
             child.addanalyzer(ancls, *anargs, **ankwargs)
+        # optimize() always needs Eq to return statistics, including stats=False.
+        if not child.p.stats and not any(
+                kwargs.get('_name', cls.__name__.lower()) == 'eq'
+                for cls, _, kwargs in child.analyzers):
+            from .analyzers import Eq
+            child.addanalyzer(Eq, _name='eq')
         child.observers.extend(engine.observers)
         child.addstrategy(strategy, **params)
         strategies = child.run()
