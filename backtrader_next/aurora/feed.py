@@ -56,9 +56,10 @@ Exposes selected backtrader-style DataBase methods:
 - advance(), home(), forward(), rewind()
 - Indexing: data[0] (current), data[-1] (previous)
 
-The shared NumPy index and native line views differ from Cerebro's data
-buffers. Use StandardData(feed) for standard runonce indicator inputs, or
-pass this feed directly to backtrader_next.aurora.indicators.
+Standard runonce indicators adapt this feed and its individual column views
+automatically. StandardData(feed) exposes standard column expressions and
+delays. Native indicators from backtrader_next.aurora.indicators also accept
+the feed directly.
 
 Usage:
 ------
@@ -221,6 +222,10 @@ class AuroraDataBase(_ArrayFeed):
             Cerebro or Aurora instance
         """
         return self._env
+
+    def _as_standard(self):
+        from ._standard import StandardData
+        return StandardData(self)
     
     def _start(self):
         """

@@ -54,7 +54,7 @@ class Aurora(with_metaclass(MetaParams, object)):
     - No replay/resample modes
     - No runnext mode (always runonce)
     - Simplified timer API
-    - Standard indicators require an explicit StandardData(feed) input view
+    - Standard indicator support is limited to preloaded runonce execution
     - Use AuroraStrategy and Aurora feeds; stepping-only indicators are unsupported
 
     Existing Cerebro strategies require adaptation. Similar method names do

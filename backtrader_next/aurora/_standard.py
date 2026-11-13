@@ -1,8 +1,8 @@
 """StandardData: standard line interfaces over Aurora input storage.
 
 Aurora calculates standard dependency graphs after preloading and advances
-their output cursors by clock. Automatic public input adaptation remains
-a separate integration step.
+their output cursors by clock. Native feed/line inputs to standard indicators
+are adapted to fresh views through the same interface.
 """
 
 from backtrader_next.dataseries import OHLCDateTime
@@ -98,8 +98,9 @@ class _StandardLines(OHLCDateTime.lines):
 class StandardData(OHLCDateTime):
     """A close-first indicator view over an Aurora feed's storage and cursor.
 
-    Construct a view in each strategy's __init__, then pass it or its lines to
-    standard runonce indicators. Expressions and delays use standard operators.
+    Standard indicators adapt native feeds and their lines automatically.
+    Construct an explicit view in __init__ for feed-column expressions and
+    delays, or pass it directly to standard runonce indicators.
     Use the original Aurora feed for orders and broker position selection.
     May be constructed before preloading. Column views resolve from the feed
     on access, so a subsequent reload does not leave stale NumPy references.
@@ -109,6 +110,9 @@ class StandardData(OHLCDateTime):
     def __init__(self, feed):
         if not isinstance(feed, AuroraDataBase):
             raise TypeError('Standard Aurora data requires an AuroraDataBase feed')
+        # Input views have a feed clock. Stack-based ownership during indicator
+        # construction would make that indicator depend on itself.
+        self._owner = None
         self._clock = feed
         self._minperiod = feed._minperiod
         self.lines = self.l = _StandardLines(feed)

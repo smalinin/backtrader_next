@@ -23,9 +23,10 @@
 """Aurora backtesting with NumPy feeds and native or standard indicators.
 
 Use AuroraStrategy and AuroraPandasData/AuroraCSVData. Standard runonce
-indicators use StandardData(feed); native indicators use aurora.indicators.
-Direct native inputs to bt.ind.*, live trading, runnext, resampling, replay
-and feed filters remain unsupported. See docs/aurora/README.md.
+indicators accept feeds and feed-backed lines; StandardData provides explicit
+line expressions. Native indicators use aurora.indicators. Live trading,
+runnext, resampling, replay and feed filters remain unsupported.
+See docs/aurora/README.md.
 """
 
 __version__ = '0.1.0'

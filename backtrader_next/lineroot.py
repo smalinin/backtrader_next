@@ -42,8 +42,15 @@ class _ArrayFeed:
     """Feed interface for array backends independent of the LineRoot hierarchy.
 
     Implementations provide the feed's line container, aliases, clock and
-    period metadata directly, without a LineSeries wrapper.
+    period metadata directly, without a LineSeries wrapper. _as_standard()
+    provides a standard input view when an indicator consumes the feed.
     """
+
+    __slots__ = ()
+
+
+class _ArrayLine:
+    """Array-backend line exposing a standard input through _as_standard()."""
 
     __slots__ = ()
 

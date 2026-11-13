@@ -23,12 +23,13 @@
 """Column views over Aurora's shared NumPy storage and cursor."""
 
 import numpy as np
+from backtrader_next.lineroot import _ArrayFeed, _ArrayLine
 from backtrader_next.utils import num2date
 
 NAN = float('NaN')
 
 
-class AuroraLineBufferView:
+class AuroraLineBufferView(_ArrayLine):
     """
     View into a column of a 2D numpy array.
     
@@ -65,6 +66,13 @@ class AuroraLineBufferView:
         self.bindings = []
         self._tz = None
         self._array_len = len(parent_array)  # Cache array length
+
+    def _as_standard(self):
+        if not isinstance(self._clock, _ArrayFeed):
+            raise TypeError('Standard indicators require a feed-backed Aurora line')
+        data = self._clock._as_standard()
+        name = self.parent_data._linenames[self.column_idx]
+        return getattr(data.lines, name)
     
     @property
     def _idx(self):

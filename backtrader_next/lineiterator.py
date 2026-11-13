@@ -29,7 +29,7 @@ from .utils.py3 import with_metaclass, string_types
 from .utils import DotDict
 from .utils.datasync import home_indicators
 
-from .lineroot import LineRoot, LineSingle, _ArrayFeed
+from .lineroot import LineRoot, LineSingle, _ArrayFeed, _ArrayLine
 from .linebuffer import LineActions, LineNum
 from .lineseries import LineSeries, LineSeriesMaker
 from .dataseries import DataSeries
@@ -52,12 +52,16 @@ class MetaLineIterator(LineSeries.__class__):
         mindatas = _obj._mindatas
         lastarg = 0
         _obj.datas = []
+        isindicator = isinstance(_obj, IndicatorBase)
         for arg in args:
             if isinstance(arg, LineRoot):
                 _obj.datas.append(LineSeriesMaker(arg))
 
             elif isinstance(arg, _ArrayFeed):
-                _obj.datas.append(arg)
+                _obj.datas.append(arg._as_standard() if isindicator else arg)
+
+            elif isindicator and isinstance(arg, _ArrayLine):
+                _obj.datas.append(LineSeriesMaker(arg._as_standard()))
 
             elif not mindatas:
                 break  # found not data and must not be collected
@@ -77,6 +81,9 @@ class MetaLineIterator(LineSeries.__class__):
         # main datas of the owner, easing up adding "self.data" ...
         if not _obj.datas and isinstance(_obj, (IndicatorBase, ObserverBase)):
             _obj.datas = _obj._owner.datas[0:mindatas]
+            if isindicator:
+                _obj.datas = [data._as_standard() if isinstance(data, _ArrayFeed) else data
+                              for data in _obj.datas]
 
         # Create a dictionary to be able to check for presence
         # lists in python use "==" operator when testing for presence with "in"
