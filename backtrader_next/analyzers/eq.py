@@ -53,7 +53,12 @@ class Eq(bt.Analyzer):
         independently of the observation frequency or trading calendar.
         Daily-return statistics use their separate annualization factor.
 
-        Without daily drawdowns, drawdown magnitude and duration are zero,
+        Drawdowns, episode durations, peaks and Ulcer Index use every recorded
+        equity point, including intraday observations. Return and volatility
+        annualization uses daily returns. Recovery factor uses the full-period
+        equity change and the maximum drawdown of the full curve.
+
+        Without drawdowns, drawdown magnitude and duration are zero,
         and Drawdown Peak is NaT. Ratios requiring a nonzero drawdown remain NaN.
 
       - ``gen_eq()``
@@ -213,8 +218,9 @@ class Eq(bt.Analyzer):
         annual_trading_days = float(365 if index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
 
-        day_dd = (1 - day_eq / day_eq.cummax()) * 100
-        dd_dur, dd_peaks = compute_drawdown_duration_peaks(day_dd)
+        # Use the same observation frequency as gen_eq_dd(), retaining intraday risk.
+        dd = (1 - eq_df['value'] / eq_df['value'].cummax()) * 100
+        dd_dur, dd_peaks = compute_drawdown_duration_peaks(dd)
 
         trades_df['Duration'] = trades_df['dateclose'] - trades_df['dateopen']
         commissions = sum(trades_df['commission'].to_numpy())
@@ -297,14 +303,14 @@ class Eq(bt.Analyzer):
 
         # s.loc['VWR Ratio'] = calc_vwr(eq_days=equity_df['Equity'].resample('D').last().dropna().to_numpy())
         s.loc['VWR Ratio'] = round(calc_vwr(eq_days=day_eq.to_numpy(), annual_trading_days=annual_trading_days), 4)
-        max_dd = -np.nan_to_num(day_dd.max())
+        max_dd = -np.nan_to_num(dd.max())
         s.loc['Calmar Ratio'] = round((annualized_return * 100) / abs(max_dd), 4) if max_dd != 0 else np.nan
 
-        ulcer_index = float(np.sqrt(np.mean(day_dd ** 2)))
+        ulcer_index = float(np.sqrt(np.mean(dd ** 2)))
         s.loc['Ulcer Index'] = round(ulcer_index, 4)
         s.loc['UPI'] = round((annualized_return * 100) / ulcer_index, 4) if ulcer_index != 0 else np.nan
 
-        total_return = day_returns.add(1).prod() - 1
+        total_return = equity_ratio - 1
         s.loc['Recovery factor [%]'] = round(total_return / abs(max_dd) * 100, 4) if abs(max_dd) != 0 else np.nan
 
         s.loc['Max. Drawdown [%]'] = round(max_dd, 4)
@@ -317,7 +323,7 @@ class Eq(bt.Analyzer):
         dd_dur_mean = dd_dur.mean() if not dd_dur.empty else pd.Timedelta(0)
         s.loc['Avg. Drawdown Duration'] = _round_timedelta(dd_dur_mean)
         s.loc['Avg. Drawdown Duration [D]'] = round(dd_dur_mean.total_seconds() / 86400, 4)
-        s.loc['Drawdown Peak'] = day_dd.idxmax() if max_dd != 0 else pd.NaT
+        s.loc['Drawdown Peak'] = dd.idxmax() if max_dd != 0 else pd.NaT
         s.loc['# Trades'] = n_trades = len(trades_df)
         win_rate = np.nan if not n_trades else (pl > 0).mean()
         s.loc['Win Rate [%]'] = round(win_rate * 100, 4)

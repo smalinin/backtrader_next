@@ -15,6 +15,10 @@ class MACD(MultiLineIndicator):
     
     Trend-following momentum indicator showing relationship between two EMAs.
     Has three lines: MACD, Signal, and Histogram.
+
+    Both EMA period orders are supported. MACD becomes available after
+    max(period_me1, period_me2) bars; signal and histogram require another
+    period_signal - 1 bars. Earlier values are NaN. Periods must be positive.
     
     Params:
         - period_me1 (default=12): Fast EMA period
@@ -50,8 +54,10 @@ class MACD(MultiLineIndicator):
             period_me2: Slow EMA period
             period_signal: Signal line period
         """
+        if period_me1 < 1 or period_me2 < 1 or period_signal < 1:
+            raise ValueError('MACD periods must be positive')
         super().__init__(data, period_me1=period_me1, period_me2=period_me2, period_signal=period_signal)
-        self._period = period_me2 + period_signal - 1  # Total minperiod: slow seed + signal seed - 1
+        self._period = max(period_me1, period_me2) + period_signal - 1
         self._period_me1 = period_me1
         self._period_me2 = period_me2
         self._period_signal = period_signal
@@ -84,6 +90,9 @@ class MACD(MultiLineIndicator):
         Returns:
             Tuple of (macd, signal, histogram) numpy arrays
         """
+        if fast_period < 1 or slow_period < 1 or signal_period < 1:
+            raise ValueError('MACD periods must be positive')
+
         # Calculate fast and slow EMAs
         fast_ema = EMA._calculate(close, fast_period)
         slow_ema = EMA._calculate(close, slow_period)
@@ -91,11 +100,10 @@ class MACD(MultiLineIndicator):
         # MACD = fast EMA - slow EMA
         macd = fast_ema - slow_ema
         
-        # Signal = EMA of MACD
-        # Remove NaN values for signal calculation
+        # Seed the signal only after both price EMAs have warmed up.
         signal = np.full(len(macd), np.nan)
-        valid_start = slow_period - 1  # Where MACD becomes valid
-        if valid_start < len(macd):
+        valid_start = max(fast_period, slow_period) - 1
+        if len(macd) - valid_start >= signal_period:
             macd_valid = macd[valid_start:]
             signal_temp = EMA._calculate(macd_valid, signal_period)
             signal[valid_start:] = signal_temp
