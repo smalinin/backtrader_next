@@ -48,6 +48,7 @@ from . import analyzers
 from .writer import WriterFile
 from .utils import OrderedDict, tzparse, num2date, date2num
 from .utils.datasync import DataSynchronizer
+from .utils.notifications import notify_broker
 from .strategy import Strategy, SignalStrategy
 from .tradingcal import (TradingCalendarBase, TradingCalendar, PandasMarketCalendar)
 from .timer import Timer
@@ -1676,20 +1677,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
             writer.stop()
 
     def _brokernotify(self):
-        '''
-        Internal method which kicks the broker and delivers any broker
-        notification to the strategy
-        '''
-        self._broker.next()
-        # Direct deque access — avoids get_notification() call + IndexError per bar
-        notifs = self._broker.notifs
-        while notifs:
-            order = notifs.popleft()
-            owner = order.owner
-            if owner is None:
-                owner = self.runningstrats[0]  # default
-
-            owner._addnotification(order, quicknotify=self.p.quicknotify)
+        """Process and deliver broker notifications through the shared policy."""
+        notify_broker(self)
 
     def _next_writers(self, runstrats):
         if not self.runwriters:

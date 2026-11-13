@@ -33,6 +33,7 @@ from ..utils.py3 import with_metaclass, string_types
 from ..brokers import BackBroker
 from ..utils import OrderedDict
 from ..utils.datasync import DataSynchronizer, home_indicators
+from ..utils.notifications import notify_broker
 from ..nplot.utils import gen_timestamp
 from ._lifecycle import CleanupOnExit
 
@@ -645,9 +646,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         Removes overhead of multi-data synchronization.
         '''
         data = self.datas[0]
-        broker = self._broker
-        broker_next = broker.next
-        broker_notifs = broker.notifs  # direct deque access — avoids get_notification() + IndexError per bar
+        broker_notify = self._brokernotify
         
         # Pre-calculate total bars for fast loop (use _length, not len() which depends on _idx)
         total_bars = data._length
@@ -669,15 +668,7 @@ class Aurora(with_metaclass(MetaParams, object)):
                 if data.is_end:
                     data.is_on = False
                 
-                # Broker processing  
-                broker_next()
-                
-                # Distribute notifications via direct deque (no IndexError per bar)
-                while broker_notifs:
-                    order = broker_notifs.popleft()
-                    owner = order.owner
-                    if owner:
-                        owner._addnotification(order)
+                broker_notify()
                 
                 # Strategy tick
                 strat_oncepost(dt0, None)
@@ -691,15 +682,7 @@ class Aurora(with_metaclass(MetaParams, object)):
                 if data.is_end:
                     data.is_on = False
                 
-                # Broker processing
-                broker_next()
-                
-                # Distribute notifications via direct deque
-                while broker_notifs:
-                    order = broker_notifs.popleft()
-                    owner = order.owner
-                    if owner:
-                        owner._addnotification(order)
+                broker_notify()
                 
                 # Strategy ticks
                 for strat in runstrats:
@@ -721,8 +704,7 @@ class Aurora(with_metaclass(MetaParams, object)):
             except (AttributeError, StopIteration):
                 dts.append(float('inf'))
         
-        broker = self._broker
-        broker_notifs = broker.notifs  # direct deque access — avoids get_notification() + IndexError per bar
+        broker_notify = self._brokernotify
         ndatas = len(datas)
         
         # Main execution loop
@@ -751,15 +733,7 @@ class Aurora(with_metaclass(MetaParams, object)):
                         dts[i] = float('inf')
                         datas[i].is_on = False
             
-            # Notify broker (process pending orders, check stops)
-            broker.next()
-            
-            # Distribute notifications via direct deque (no get_notification() call + IndexError per bar)
-            while broker_notifs:
-                order = broker_notifs.popleft()
-                owner = order.owner
-                if owner:
-                    owner._addnotification(order)
+            broker_notify()
             
             # Call strategies with current datetime and all datetimes
             for strat in runstrats:
@@ -776,24 +750,8 @@ class Aurora(with_metaclass(MetaParams, object)):
                         dts[i] = float('inf')
     
     def _brokernotify(self):
-        '''
-        Process broker notifications
-        
-        This method:
-        - Calls broker.next() to process pending orders
-        - Distributes order/trade notifications to strategies
-        '''
-        # Process broker logic (fills, stops, etc.)
-        self._broker.next()
-        
-        # Get notifications directly from deque (avoids get_notification() + IndexError overhead)
-        notifs = self._broker.notifs
-        while notifs:
-            order = notifs.popleft()
-            owner = order.owner
-            if owner:
-                owner._addnotification(order)
-    
+        notify_broker(self)
+
     def _normalize_metrics(self, df, metrics_config):
         '''
         Normalize metrics to [0, 1] range for multi-objective optimization
