@@ -20,7 +20,7 @@ from backtrader_next.utils.dateintern import format_datetime
 
 from ..utils.py3 import with_metaclass
 from ..utils.date import format_datetime
-from ..dataseries import DataSeries
+from ..lineiterator import IndicatorBase
 from .. import AutoInfoClass, MetaParams, TimeFrame, date2num, num2date
 from .nscheme import PlotScheme
 
@@ -626,25 +626,30 @@ class Plot(with_metaclass(MetaParams, object)):
         return chart_data, charts_down
 
 
-    #+-
+    @staticmethod
+    def _plotkey(clock, strategy, force=False):
+        """Resolve input views and line actions without comparing line values."""
+        visited = set()
+        while clock is not None and id(clock) not in visited:
+            visited.add(id(clock))
+            if any(clock is data for data in strategy.datas):
+                return clock
+            if clock is strategy:
+                return strategy.data
+            if isinstance(clock, IndicatorBase) and not force:
+                return clock
+            # A line expression's clock can be a secondary feed even when its
+            # owner is the strategy. Output lines without clocks use their owner.
+            parent = getattr(clock, '_clock', None)
+            clock = parent if parent is not None else getattr(clock, '_owner', None)
+        raise ValueError('Plotting clock is cyclic or does not reach a strategy feed')
+
     def sortdataindicators(self, strategy:Strategy):
         # These lists/dictionaries hold the subplots that go above each data
         self.dplots_top = list()
         self.dplots_up = collections.defaultdict(list)
         self.dplots_down = collections.defaultdict(list)
         self.dplots_over = collections.defaultdict(list)
-
-        # Sort observers in the different lists/dictionaries
-        #??TODO
-        # for x in strategy.getobservers():
-        #     if not x.plotinfo.plot or x.plotinfo.plotskip:
-        #         continue
-
-        #     if x.plotinfo.subplot:
-        #         self.dplots_top.append(x)
-        #     else:
-        #         key = getattr(x._clock, 'owner', x._clock)
-        #         self.dplots_over[key].append(x)
 
         # Sort indicators in the different lists/dictionaries
         for x in strategy.getindicators():
@@ -657,29 +662,15 @@ class Plot(with_metaclass(MetaParams, object)):
 
             x._plotinit()  # will be plotted ... call its init function
 
-            # support LineSeriesStub which has "owner" to point to the data
-            key = getattr(x._clock, 'owner', x._clock)
-            # StandardData is an input facade over a strategy's Aurora feed.
-            # Keep indicator parents intact so chained overlays stay attached.
-            if isinstance(key, DataSeries) and all(key is not data for data in strategy.datas):
-                key = getattr(key, '_clock', key)
-            if key is strategy:  # a LinesCoupler
-                key = strategy.data
-
-            if getattr(x.plotinfo, 'plotforce', False):
-                if key not in strategy.datas:
-                    datas = strategy.datas
-                    while True:
-                        if key not in strategy.datas:
-                            key = key._clock
-                        else:
-                            break
-
             xpmaster = x.plotinfo.plotmaster
             if xpmaster is x:
                 xpmaster = None
-            if xpmaster is not None:
-                key = xpmaster
+            source = x._clock if xpmaster is None else xpmaster
+            try:
+                key = self._plotkey(source, strategy,
+                                    force=xpmaster is None and x.plotinfo.plotforce)
+            except ValueError as error:
+                raise ValueError(f'Cannot resolve plotting clock for {type(x).__name__}: {error}') from error
 
             if x.plotinfo.subplot and xpmaster is None:
                 if x.plotinfo.plotabove:
