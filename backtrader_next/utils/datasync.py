@@ -31,6 +31,87 @@ def home_indicators(owner):
         indicator.home()
 
 
+class _IndicatorSchedule:
+    """Static dependency order for one prepared runonce graph."""
+
+    def __init__(self, owner):
+        # Runtime imports avoid the lineiterator/datasync import cycle.
+        from functools import partial
+        from ..indicator import Indicator
+        from ..linebuffer import LineBuffer
+        from ..lineseries import LineSeries, Lines
+
+        def length_reader(source):
+            # LineSeries -> Lines -> LineBuffer are pure length proxies.
+            # Preserve Python's len protocol for any overridden implementation.
+            if (type(source).__len__ is LineSeries.__len__
+                    and type(source.lines).__len__ is Lines.__len__
+                    and type(source.lines[0]).__len__ is LineBuffer.__len__):
+                return source.lines[0].__len__, True
+            return partial(len, source), False
+
+        nodes = _indicator_graph(owner)
+        rows, roots, visiting = [], {}, set()
+
+        def collect(indicator):
+            key = id(indicator)
+            if key in roots:
+                return roots[key]
+            if key in visiting:
+                raise ValueError('Cyclic indicator clock dependency')
+            visiting.add(key)
+            clock = indicator._clock
+            dependency = nodes.get(id(clock))
+            if dependency is None:
+                dependency = nodes.get(id(clock.lines[0]))
+            if dependency is None:
+                dependency = nodes.get(id(getattr(clock, '_owner', None)))
+            if dependency is not None:
+                affected = collect(dependency)
+            else:
+                shared = getattr(clock, '_once_cursor', None)
+                parent = getattr(clock, '_owner', None)
+                affected = frozenset((id(clock), id(parent), id(shared),
+                                      id(getattr(parent, '_once_cursor', None))))
+            roots[key] = affected
+            visiting.remove(key)
+            current_length, standard_output = length_reader(indicator)
+            clock_length, standard_clock = length_reader(clock)
+            advance = indicator.advance
+            if (standard_output and standard_clock
+                    and getattr(advance, '__func__', None) is Indicator.advance):
+                # The positive gap below already proves the base method's guard.
+                # Custom advance/length methods keep their original call path.
+                advance = indicator.lines.advance
+            rows.append((current_length, clock_length, indicator.buflen(), advance, affected))
+            return affected
+
+        for indicator in nodes.values():
+            collect(indicator)
+        self.rows = tuple(rows)
+
+    def advance(self, clocks=None):
+        for current_length, clock_length, bound, advance, affected in self.rows:
+            if clocks is not None and affected.isdisjoint(clocks):
+                continue
+            size = min(clock_length(), bound) - current_length()
+            if size > 0:
+                advance(size=size)
+
+
+def prepare_indicator_schedule(owner):
+    """Build per-run navigation after all output arrays have been calculated."""
+    owner._indicator_schedule = _IndicatorSchedule(owner)
+    for observer in owner._obs_iterator:
+        prepare_indicator_schedule(observer)
+
+
+def _clear_indicator_schedule(owner):
+    owner.__dict__.pop('_indicator_schedule', None)
+    for observer in owner._obs_iterator:
+        _clear_indicator_schedule(observer)
+
+
 def advance_indicators(owner, clocks=None):
     """Align calculated outputs to their clocks, optionally for activated data.
 
@@ -39,6 +120,10 @@ def advance_indicators(owner, clocks=None):
     may consume another output value. A strategy clock can outlive its first
     feed, so output navigation is also bounded by the calculated buffer length.
     """
+    schedule = owner.__dict__.get('_indicator_schedule')
+    if schedule is not None:
+        schedule.advance(clocks)
+        return
     nodes = _indicator_graph(owner)
     visited = {}
 
@@ -99,6 +184,8 @@ class DataSynchronizer:
         self.environment._data_sync = None
         for data in self.environment.datas:
             data._activation_dt = None
+        for strategy in self.strategies:
+            _clear_indicator_schedule(strategy)
 
     def bars(self):
         """Iterate Aurora bars; leave broker/strategy dispatch to the engine."""
