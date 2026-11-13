@@ -12,6 +12,8 @@ standard bt.ind.* and bt.nind.* indicators are not supported.
 import backtrader_next as bt
 from backtrader_next.strategy import Strategy
 
+from ._lifecycle import CleanupOnExit
+
 
 class AuroraStrategy(Strategy):
     """
@@ -226,6 +228,15 @@ class AuroraStrategy(Strategy):
         for analyzer in s_direct:
             analyzer.notify_cashvalue(cash, value)
             analyzer.notify_fund(cash, value, fundvalue, fundshares)
+
+    def _stop(self):
+        # A failing strategy/analyzer stop must not prevent the remaining
+        # analyzers from closing or leave data in the execution stage.
+        stops = [analyzer._stop for analyzer in self.analyzers]
+        stops.extend(analyzer._stop for analyzer in self._slave_analyzers)
+        stops.append(self._stage1)
+        with CleanupOnExit(stops):
+            self.stop()
 
     def clear(self):
         """

@@ -76,6 +76,8 @@ def _record_failure(engine, record):
 
 
 def _cleanup_failed_run(child, error):
+    if getattr(child, '_run_cleanup_complete', False):
+        return
     # A failed run bypasses the engines' normal stop sequence. Release resources
     # before reusing feeds, without replacing the exception that caused failure.
     stops = [strat._stop for strat in getattr(child, 'runningstrats', ())]

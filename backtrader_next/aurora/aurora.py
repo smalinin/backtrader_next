@@ -34,6 +34,7 @@ from ..brokers import BackBroker
 from ..utils import OrderedDict
 from ..utils.datasync import DataSynchronizer
 from ..nplot.utils import gen_timestamp
+from ._lifecycle import CleanupOnExit
 
 
 class Aurora(with_metaclass(MetaParams, object)):
@@ -129,6 +130,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         self._dorunonce = True
         self._dolive = False
         self._dooptimize = False  # Optimization mode flag
+        self._run_cleanup_complete = False
         
         # Strategy counter (for _id assignment)
         self._init_stcount()
@@ -466,62 +468,46 @@ class Aurora(with_metaclass(MetaParams, object)):
         iterstrats = itertools.product(*self.strats)
         self.runstrats = list()
         
-        # Create progress bar for optimization
+        # The parent owns preloaded feeds and the progress bar during native
+        # multiprocessing optimization. Workers manage their own run resources.
         progress = None
-        strats_total = 0
-        if self._dooptimize:
-            strats_total = [len(lst) for lst in self.strats]
-            strats_total = math.prod(strats_total)
-            progress = tqdm(total=strats_total, desc="Optimization...")
-        
-        # Execute strategies: single-process or multi-process
-        # maxcpus=1 (default) -> single process
-        # maxcpus=2,3,4,... -> multi-process with specified cores
-        # maxcpus=None -> multi-process with all cores
-        use_multiprocessing = self._dooptimize and self.p.maxcpus != 1
-        
-        if not use_multiprocessing:
-            # Single process mode (default for non-optimization or maxcpus=1)
-            for iterstrat in iterstrats:
-                runstrat = self.runstrategies(iterstrat)
-                self.runstrats.append(runstrat)
-                
-                # Update progress and call callbacks for optimization
+        data_stops = []
+        progress_stops = []
+        self._run_cleanup_complete = False
+        try:
+            with CleanupOnExit(itertools.chain(data_stops, progress_stops)):
                 if self._dooptimize:
-                    if progress is not None:
-                        progress.update(1)
-                    for cb in self.optcbs:
-                        cb(runstrat)  # callback receives finished strategy
-        else:
-            # Multi-process mode for optimization
-            if self.p.optdatas and self._dopreload and self._dorunonce:
-                # Preload data once for all processes
-                for data in self.datas:
-                    data.reset()
-                    data._start()
-                    if self._dopreload:
-                        data.preload()
-            
-            # Use multiprocessing.Pool for parallel optimization
-            with multiprocessing.Pool(self.p.maxcpus or None) as pool:
-                for r in pool.imap(self, iterstrats):
-                    self.runstrats.append(r)
-                    if progress is not None:
-                        progress.update(1)
-                    # Note: callbacks with local functions don't work with multiprocessing
-                    for cb in self.optcbs:
-                        cb(r)  # callback receives finished strategy
-                pool.close()
-                pool.join()
-            
-            if self.p.optdatas and self._dopreload and self._dorunonce:
-                # Stop data after all processes complete
-                for data in self.datas:
-                    data.stop()
-        
-        # Close progress bar
-        if progress is not None:
-            progress.close()
+                    strats_total = math.prod(len(lst) for lst in self.strats)
+                    progress = tqdm(total=strats_total, desc="Optimization...")
+                    progress_stops.append(progress.close)
+
+                use_multiprocessing = self._dooptimize and self.p.maxcpus != 1
+                if not use_multiprocessing:
+                    for iterstrat in iterstrats:
+                        runstrat = self.runstrategies(iterstrat)
+                        self.runstrats.append(runstrat)
+                        if self._dooptimize:
+                            progress.update(1)
+                            for cb in self.optcbs:
+                                cb(runstrat)
+                else:
+                    if self.p.optdatas and self._dopreload and self._dorunonce:
+                        for data in self.datas:
+                            data.reset()
+                            data_stops.append(data.stop)
+                            data._start()
+                            data.preload()
+
+                    with multiprocessing.Pool(self.p.maxcpus or None) as pool:
+                        for result in pool.imap(self, iterstrats):
+                            self.runstrats.append(result)
+                            progress.update(1)
+                            for cb in self.optcbs:
+                                cb(result)
+                        pool.close()
+                        pool.join()
+        finally:
+            self._run_cleanup_complete = True
         
         # Extract statistics from Eq analyzer (only for single run)
         if self.p.stats and self.runstrats and not self._dooptimize:
@@ -557,79 +543,59 @@ class Aurora(with_metaclass(MetaParams, object)):
             List[Strategy]: Executed strategy instances
         '''
         self.runningstrats = runstrats = list()
-        
-        # Start broker
-        self._broker.start()
-        
-        # Initialize and start all data feeds (unless predata is True)
-        if not predata:
-            for data in self.datas:
-                data.reset()
-                data._start()
-                if self._dopreload:
-                    data.preload()
-        
-        # Get default sizer
-        defaultsizer = self.sizers.get(None, (None, None, None))
-        
-        # Instantiate strategies
-        for idx, (stratcls, sargs, skwargs) in enumerate(iterstrat):
-            # Pass Aurora instance to strategy
-            skwargs['_cerebro'] = self  # Pass Aurora as cerebro
-            
-            # Prepend datas to args (strategies expect data feeds as first positional args)
-            sargs_list = list(self.datas) + list(sargs)
-            
-            # Now call strategy constructor
-            strat = stratcls(*sargs_list, **skwargs)
-            
-            # Set broker
-            strat.broker = self._broker
-            
-            # Instantiate and attach analyzers
-            for ancls, anargs, ankwargs in self.analyzers:
-                strat._addanalyzer(ancls, *anargs, **ankwargs)
+        self._run_cleanup_complete = False
+        strategy_stops = []
+        data_stops = [data.stop for data in self.datas] if predata else []
+        broker_stops = []
+        try:
+            with CleanupOnExit(itertools.chain(strategy_stops, data_stops, broker_stops)):
+                # Register shutdown before startup to cover partial initialization.
+                broker_stops.append(self._broker.stop)
+                self._broker.start()
 
-            # Keep the automatic analyzer local to this strategy/run.
-            if self.p.stats and 'eq' not in strat.analyzers.getnames():
-                from ..analyzers import Eq
-                strat._addanalyzer(Eq, _name='eq')
-            
-            # Instantiate and attach observers
-            for multi, obscls, obargs, obkwargs in self.observers:
-                if multi:
-                    # Add one observer per data feed
+                if not predata:
                     for data in self.datas:
-                        strat._addobserver(True, obscls, *obargs, data=data, **obkwargs)
-                else:
-                    # Add single observer
-                    strat._addobserver(False, obscls, *obargs, **obkwargs)
-            
-            # Attach sizer (default or strategy-specific)
-            sizer, sargs_sz, skwargs_sz = self.sizers.get(idx, defaultsizer)
-            if sizer is not None:
-                strat._addsizer(sizer, *sargs_sz, **skwargs_sz)
-            
-            # Initialize strategy
-            strat._start()
-            
-            runstrats.append(strat)
-        
-        # Run strategies in runonce mode
-        if runstrats:
-            self._runonce(runstrats)
-            
-            # Stop strategies
-            for strat in runstrats:
-                strat._stop()
-        
-        # Stop data feeds
-        for data in self.datas:
-            data.stop()
-        
-        # Stop broker
-        self._broker.stop()
-        
+                        data.reset()
+                        data_stops.append(data.stop)
+                        data._start()
+                        if self._dopreload:
+                            data.preload()
+
+                defaultsizer = self.sizers.get(None, (None, None, None))
+                for idx, (stratcls, sargs, skwargs) in enumerate(iterstrat):
+                    skwargs = dict(skwargs, _cerebro=self)
+                    sargs_list = list(self.datas) + list(sargs)
+                    strat = stratcls(*sargs_list, **skwargs)
+                    strat.broker = self._broker
+
+                    for ancls, anargs, ankwargs in self.analyzers:
+                        strat._addanalyzer(ancls, *anargs, **ankwargs)
+
+                    if self.p.stats and 'eq' not in strat.analyzers.getnames():
+                        from ..analyzers import Eq
+                        strat._addanalyzer(Eq, _name='eq')
+
+                    for multi, obscls, obargs, obkwargs in self.observers:
+                        if multi:
+                            for data in self.datas:
+                                strat._addobserver(True, obscls, *obargs, data=data, **obkwargs)
+                        else:
+                            strat._addobserver(False, obscls, *obargs, **obkwargs)
+
+                    sizer, sargs_sz, skwargs_sz = self.sizers.get(idx, defaultsizer)
+                    if sizer is not None:
+                        strat._addsizer(sizer, *sargs_sz, **skwargs_sz)
+
+                    strategy_stops.append(strat._stop)
+                    strat._start()
+                    runstrats.append(strat)
+
+                if runstrats:
+                    self._runonce(runstrats)
+        finally:
+            # The optimizer must not stop these resources a second time.
+            self._run_cleanup_complete = True
+
         return runstrats
     
     def _runonce(self, runstrats):
