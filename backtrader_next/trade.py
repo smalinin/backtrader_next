@@ -114,6 +114,15 @@ class Trade(object):
       - ``pnl`` (``float``): current profit and loss of the trade (gross pnl)
       - ``pnlcomm`` (``float``): current profit and loss of the trade minus
         commission (net pnl)
+      - ``opened_size`` / ``closed_size``: cumulative absolute quantities of
+        entry and exit executions, including additions and partial exits
+      - ``peak_size``: maximum absolute position size during this trade
+      - ``entry_notional``: sum of absolute entry quantity * price * contract
+        multiplier, including every addition; independent of futures margin
+      - ``priceopen`` / ``priceclose``: volume-weighted prices of all entries
+        and exits; NaN when the corresponding quantity is zero
+      - ``return_pct`` / ``return_net_pct``: realized gross/net pnl divided by
+        entry_notional, as fractions; NaN when the entry notional is zero
       - ``isclosed`` (``bool``): records if the last update closed (set size to
         null the trade
       - ``isopen`` (``bool``): records if any update has opened the trade
@@ -175,6 +184,15 @@ class Trade(object):
         self.pnl = 0.0
         self.pnlcomm = 0.0
 
+        self.opened_size = abs(size)
+        self.closed_size = 0
+        self.peak_size = abs(size)
+        self._entry_price_value = abs(size) * price
+        self._exit_price_value = 0.0
+        self.entry_notional = 0.0
+        # A nonzero constructor position gets its multiplier on the first update.
+        self._initial_entry_value = self._entry_price_value
+
         self.justopened = False
         self.isopen = False
         self.isclosed = False
@@ -203,6 +221,24 @@ class Trade(object):
     def getdataname(self):
         '''Shortcut to retrieve the name of the data this trade references'''
         return self.data._name
+
+    @property
+    def priceopen(self):
+        return (self._entry_price_value / self.opened_size
+                if self.opened_size else float('nan'))
+
+    @property
+    def priceclose(self):
+        return (self._exit_price_value / self.closed_size
+                if self.closed_size else float('nan'))
+
+    @property
+    def return_pct(self):
+        return self.pnl / self.entry_notional if self.entry_notional else float('nan')
+
+    @property
+    def return_net_pct(self):
+        return self.pnlcomm / self.entry_notional if self.entry_notional else float('nan')
 
     def open_datetime(self, tz=None, naive=True):
         '''Returns a datetime.datetime object with the datetime in which
@@ -250,6 +286,10 @@ class Trade(object):
         if not size:
             return  # empty update, skip all other calculations
 
+        if self._initial_entry_value:
+            self.entry_notional += abs(self._initial_entry_value * comminfo.p.mult)
+            self._initial_entry_value = 0.0
+
         # Commission can only increase
         self.commission += commission
 
@@ -286,12 +326,19 @@ class Trade(object):
 
         if abs(self.size) > abs(oldsize):
             # position increased (be it positive or negative)
+            quantity = abs(size)
+            self.opened_size += quantity
+            self._entry_price_value += quantity * price
+            self.entry_notional += abs(quantity * price * comminfo.p.mult)
+            self.peak_size = max(self.peak_size, abs(self.size))
             # update the average price
             self.price = (oldsize * self.price + size * price) / self.size
             pnl = 0.0
 
         else:  # abs(self.size) < abs(oldsize)
             # position reduced/closed
+            self.closed_size += abs(size)
+            self._exit_price_value += abs(size) * price
             pnl = comminfo.profitandloss(-size, self.price, price)
 
         self.pnl += pnl

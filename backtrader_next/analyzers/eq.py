@@ -65,6 +65,11 @@ class Eq(bt.Analyzer):
       - ``gen_trades(data_name=None, pct=False)``
 
         Returns trade-level statistics as a pandas DataFrame.
+        Gross return_pct and net return_net_pct use the sum of all entry
+        notionals, including additions and the contract multiplier. Both are
+        fractions unless pct=True. A zero entry_notional gives NaN returns.
+        priceopen/priceclose are volume-weighted execution prices; size is
+        the peak position quantity with its direction sign.
 
       - ``gen_orders(data_name=None)``
 
@@ -87,7 +92,8 @@ class Eq(bt.Analyzer):
 
         self.rets_header = ['Datetime', 'value'] + ['cash'] * self.p.cash
         self.trades_header = ['ref', 'data_name', 'tradeid', 'commission', 'pnl', 'pnlcomm', 'return_pct',
-                            'dateopen', 'dateclose','size','barlen','priceopen','priceclose']
+                            'dateopen', 'dateclose','size','barlen','priceopen','priceclose',
+                            'entry_notional', 'return_net_pct']
         self.orders_header = ['o_ref','data_name', 'o_datetime', 'o_ordtype', 'o_price', 'o_size']
 
         self.returns = None
@@ -96,27 +102,14 @@ class Eq(bt.Analyzer):
         self.eq_df = None
         self.trades_df = None
         self.orders_df = None
-        self._trade_sizes = {}
-        self._last_exec_price = {}  # data._name -> last executed price
 
     def notify_trade(self, trade):
-        if not trade.isclosed:
-            # Track peak absolute size (handles scaling-in: multiple buys before one sell)
-            prev = self._trade_sizes.get(trade.ref, 0)
-            self._trade_sizes[trade.ref] = max(prev, abs(trade.size))
-
-        elif trade.status == trade.Closed:
-            max_size = self._trade_sizes.pop(trade.ref, None)
-            if max_size and trade.price:
-                price_close = self._last_exec_price.get(trade.data._name, 0.0)
-                return_pct = (price_close / trade.price - 1) * (1 if trade.long else -1)
-            else:
-                return_pct = 0.0
-                price_close = 0.0
-            size = (1 if trade.long else -1)
+        if trade.isclosed:
+            size = trade.peak_size * (1 if trade.long else -1)
             self.trades.append([trade.ref, trade.data._name, trade.tradeid, trade.commission,
-                                trade.pnl, trade.pnlcomm, return_pct, trade.open_datetime(),
-                                trade.close_datetime(), size, trade.barlen, trade.price, price_close])
+                                trade.pnl, trade.pnlcomm, trade.return_pct, trade.open_datetime(),
+                                trade.close_datetime(), size, trade.barlen, trade.priceopen,
+                                trade.priceclose, trade.entry_notional, trade.return_net_pct])
 
 
     def notify_fund(self, cash, value, fundvalue, shares):
@@ -146,7 +139,6 @@ class Eq(bt.Analyzer):
     def notify_order(self, order):
         if order.status not in [Order.Partial, Order.Completed]:
             return  # It's not an execution
-        self._last_exec_price[order.data._name] = order.executed.price
         self.orders.append([order.ref, order.data._name, order.data.datetime.datetime(),
                             order.ordtype, order.executed.price, order.executed.size])
 
@@ -186,7 +178,7 @@ class Eq(bt.Analyzer):
         else:
             rdf = self.trades_df[self.trades_df['data_name'] == data_name].copy()
         if pct:
-            rdf['return_pct'] = rdf['return_pct'] * 100
+            rdf[['return_pct', 'return_net_pct']] = rdf[['return_pct', 'return_net_pct']] * 100
         return rdf
 
     def gen_orders(self, data_name=None) -> 'DataFrame':
@@ -329,7 +321,7 @@ class Eq(bt.Analyzer):
         s.loc['Worst Trade [%]'] = round(returns_pct.min() * 100, 4)
         avg_trade_return = returns_pct.mean()
         s.loc['Avg. Trade [%]'] = round(avg_trade_return * 100, 4)
-        mean_return = geometric_mean(returns_pct)
+        mean_return = geometric_mean(returns_pct.dropna())
         s.loc['Avg. Geometric Trade [%]'] = round(mean_return * 100, 4)
         s.loc['Max. Trade Duration'] = _round_timedelta(durations.max())
         s.loc['Avg. Trade Duration'] = _round_timedelta(durations.mean())

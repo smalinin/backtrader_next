@@ -96,7 +96,7 @@ from . import indicators as indicators
 # Analyzers use the familiar addanalyzer API; compatibility depends on each
 # analyzer's data and lifecycle requirements. Eq is added by default.
 # Use: aurora.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
-# See README.md in this package for API boundaries and migration guidance.
+# See docs/aurora/README.md for API boundaries and migration guidance.
 
 # Exports
 __all__ = [
@@ -168,5 +168,5 @@ Usage Pattern:
     5. Run backtest
     6. Analyze results
 
-See README.md in this package for a migration example and supported APIs.
+See docs/aurora/README.md for a migration example and supported APIs.
 """

@@ -58,7 +58,7 @@ class Aurora(with_metaclass(MetaParams, object)):
 
     Existing Cerebro strategies require adaptation. Similar method names do
     not imply support for Cerebro's complete indicator or execution lifecycle.
-    See README.md in this package for migration guidance.
+    See docs/aurora/README.md for migration guidance.
     
     **Params:**
     
