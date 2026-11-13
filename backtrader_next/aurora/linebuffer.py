@@ -46,9 +46,9 @@ class AuroraLineBufferView:
     - Inline index calculation
     """
     
-    __slots__ = ('parent_array', 'column_idx', 'parent_data', 'bindings', '_tz', '_array_len')
+    __slots__ = ('parent_array', 'column_idx', 'parent_data', '_clock', 'bindings', '_tz', '_array_len')
     
-    def __init__(self, parent_array, column_idx, parent_data):
+    def __init__(self, parent_array, column_idx, parent_data, *, clock=None):
         """
         Initialize view into parent array column.
         
@@ -56,10 +56,12 @@ class AuroraLineBufferView:
             parent_array (np.ndarray): 2D array [rows x columns]
             column_idx (int): Column index (0=datetime, 1=open, etc.)
             parent_data (object): Reference to parent data object (must have _idx attribute)
+            clock (object): Cursor owner; defaults to the parent container.
         """
         self.parent_array = parent_array
         self.column_idx = column_idx
         self.parent_data = parent_data
+        self._clock = parent_data if clock is None else clock
         self.bindings = []
         self._tz = None
         self._array_len = len(parent_array)  # Cache array length
@@ -67,12 +69,12 @@ class AuroraLineBufferView:
     @property
     def _idx(self):
         """Get current index from parent."""
-        return self.parent_data._idx
+        return self._clock._idx
     
     def __getitem__(self, ago):
         """Get value at offset from current position. Optimized hot path."""
         # Inline index calculation - avoid property call overhead
-        idx = self.parent_data._idx + ago
+        idx = self._clock._idx + ago
         # Fast path: assume valid index (most common case)
         # Bounds check only for edge cases
         if idx >= 0 and idx < self._array_len:

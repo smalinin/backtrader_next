@@ -73,7 +73,7 @@ class AuroraLines:
     
     Structure:
         data: np.ndarray shape (n_bars, n_lines)
-        _idx: single int (shared by all lines)
+        _idx: cursor access (delegated to the feed, or owned when standalone)
         lines: list of AuroraLineBufferView objects (views into columns)
     
     Attributes:
@@ -84,14 +84,15 @@ class AuroraLines:
 
     Standalone containers can resize while retaining existing line objects.
     Containers attached to preloaded feeds have a fixed shape; operations that
-    would resize their matrix raise RuntimeError.
+    would resize their matrix raise RuntimeError. Attached containers and views
+    read the feed's cursor; they do not keep a second position.
     """
     
     # Default line names for OHLCV data
     _linenames = ('datetime', 'open', 'high', 'low', 'close', 'volume', 
                   'openinterest')
     
-    def __init__(self, linenames=None, initdata=None, *, copy=True):
+    def __init__(self, linenames=None, initdata=None, *, copy=True, feed=None):
         """
         Initialize AuroraLines container.
         
@@ -102,6 +103,7 @@ class AuroraLines:
                                             Shape: (n_bars, n_lines)
             copy (bool): Copy a 2D NumPy input by default. Set False to reuse
                          an existing matrix, as preloaded data feeds do.
+            feed: Optional feed owning the cursor and fixed input storage.
         """
         if linenames is not None:
             self._linenames = linenames
@@ -132,8 +134,11 @@ class AuroraLines:
             # Empty array
             self.data = np.empty((0, n_lines), dtype=np.float64)
         
-        # Single shared index for ALL lines
-        self._idx = -1
+        # Attached containers derive their position from the feed. Standalone
+        # containers own their cursor; neither case duplicates the position.
+        self._feed_ref = feed
+        if feed is None:
+            self._position = -1
         
         # Create line views (one per column)
         self.lines = []
@@ -141,13 +146,27 @@ class AuroraLines:
             view = AuroraLineBufferView(
                 parent_array=self.data,
                 column_idx=col_idx,
-                parent_data=self
+                parent_data=self,
+                clock=feed if feed is not None else self,
             )
             self.lines.append(view)
         
         # Create named attributes for each line
         for idx, name in enumerate(self._linenames):
             setattr(self, name, self.lines[idx])
+
+    @property
+    def _idx(self):
+        if self._feed_ref is not None:
+            return self._feed_ref._idx
+        return self._position
+
+    @_idx.setter
+    def _idx(self, value):
+        if self._feed_ref is not None:
+            self._feed_ref._idx = value
+        else:
+            self._position = value
     
     def __len__(self):
         """Return current length (number of bars processed)."""
@@ -213,7 +232,7 @@ class AuroraLines:
         self._idx = -1
 
     def _check_resize(self):
-        if getattr(self, '_feed_ref', None) is not None:
+        if self._feed_ref is not None:
             raise RuntimeError(
                 'Cannot resize preloaded feed lines; reset and reload the feed instead')
 
@@ -266,7 +285,11 @@ class AuroraLines:
         
         Args:
             size (int): Number of positions to rewind
+
+        Attached containers use the feed's before-first-bar bound.
         """
+        if self._feed_ref is not None:
+            return self._feed_ref.rewind(size=size)
         self._idx -= size
     
     def advance(self, size=1):
@@ -275,7 +298,12 @@ class AuroraLines:
         
         Args:
             size (int): Number of positions to advance
+
+        Attached containers delegate to the feed's bounded advance and return
+        its success flag. Standalone containers advance their own cursor.
         """
+        if self._feed_ref is not None:
+            return self._feed_ref.advance(size=size)
         self._idx += size
     
     def extend(self, value=NAN, size=0):

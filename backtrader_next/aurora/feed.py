@@ -242,8 +242,6 @@ class AuroraDataBase:
         self._idx = -1
         self._started = False
         self._preloaded = False
-        if self.lines is not None:
-            self.lines._idx = self._idx
     
     def getfeed(self):
         """
@@ -334,13 +332,8 @@ class AuroraDataBase:
             linenames=self._linenames,
             initdata=self.data,
             copy=False,
+            feed=self,
         )
-        
-        # Share the same _idx reference
-        self.lines._idx = self._idx
-
-        # Back-reference so AuroraLineBufferView can find its parent feed
-        self.lines._feed_ref = self
     
     def __len__(self):
         """
@@ -402,9 +395,6 @@ class AuroraDataBase:
         """
         if self._idx + size < self._length:
             self._idx += size
-            # Update lines container index
-            if self.lines is not None:
-                self.lines._idx = self._idx
             return True
         return False
     
@@ -416,8 +406,6 @@ class AuroraDataBase:
         This is used at the start of runonce mode.
         """
         self._idx = -1
-        if self.lines is not None:
-            self.lines._idx = self._idx
     
     def forward(self, size=1):
         """
@@ -430,8 +418,6 @@ class AuroraDataBase:
             size (int): Number of bars to move forward
         """
         self._idx += size
-        if self.lines is not None:
-            self.lines._idx = self._idx
     
     def rewind(self, size=1):
         """
@@ -441,8 +427,6 @@ class AuroraDataBase:
             size (int): Number of bars to move back
         """
         self._idx = max(-1, self._idx - size)
-        if self.lines is not None:
-            self.lines._idx = self._idx
     
     def advance_peek(self):
         """
@@ -477,8 +461,6 @@ class AuroraDataBase:
         
         # Set position to end for runonce mode
         self._idx = self._length - 1
-        if self.lines is not None:
-            self.lines._idx = self._idx
         
         self._preloaded = True
     
