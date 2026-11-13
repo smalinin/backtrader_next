@@ -975,7 +975,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         return figs
 
     def plot(self, iplot=False, start=None, end=None,
-             width=1000, height=900, show=True, filename=None, **kwargs):
+             width=1000, height=900, show=True, filename=None, show_eq=False, **kwargs):
         '''
         Plots the strategies inside cerebro
 
@@ -994,6 +994,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         ``height``: in px of the saved figure
 
+        ``show_eq``: include the strategy's equity panel (default: False)
+
         '''
         if self._exactbars > 0:
             return
@@ -1010,7 +1012,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         if 'ipykernel' in sys.modules:
             iplot = True
         plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                        width=width, height=height, show=show, filename=filename)
+                        width=width, height=height, show=show, filename=filename, show_eq=show_eq)
 
     @property
     def statistics(self) -> pd.Series:

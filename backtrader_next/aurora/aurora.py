@@ -897,7 +897,7 @@ class Aurora(with_metaclass(MetaParams, object)):
             return_heatmap, return_optimization, params, on_error)
 
     def plot(self, iplot=False, start=None, end=None,
-             width=1000, height=900, show=True, filename=None, **kwargs):
+             width=1000, height=900, show=True, filename=None, show_eq=False, **kwargs):
         '''
         Plots the strategies inside Aurora
 
@@ -920,6 +920,8 @@ class Aurora(with_metaclass(MetaParams, object)):
         
         ``filename``: filename to save the plot (default: auto-generated)
 
+        ``show_eq``: include the strategy's equity panel (default: False)
+
         '''
         from .. import nplot
         plotter = nplot.Plot(**kwargs)
@@ -930,7 +932,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         if 'ipykernel' in sys.modules:
             iplot = True
         plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                        width=width, height=height, show=show, filename=filename)
+                        width=width, height=height, show=show, filename=filename, show_eq=show_eq)
 
     @property
     def statistics(self) -> pd.Series:
@@ -960,6 +962,9 @@ class Aurora(with_metaclass(MetaParams, object)):
             name: Report title (default: auto-generated)
             filename: HTML filename to save (default: auto-generated)
             show: Whether to display the report in browser
+
+        Parameters are listed for every strategy; calculations use the first
+        strategy's Eq analyzer, as in the statistics property.
         '''
         from .. import nplot
         
@@ -983,7 +988,8 @@ class Aurora(with_metaclass(MetaParams, object)):
 
         from .. import nplot
         report_gen = nplot.Statistics()
-        report_gen.report(name=name, performance=eq, show=show, filename=filename, iplot=iplot)
+        report_gen.report(name=name, performance=eq, strats=flat_runstrats,
+                          show=show, filename=filename, iplot=iplot)
 
 
 # Convenience function for quick backtesting

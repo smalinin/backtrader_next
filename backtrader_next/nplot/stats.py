@@ -31,12 +31,6 @@ class Statistics(object):
         df_eq = performance.gen_eq()
         df_stats = performance.compute_stats()
 
-        df_desc = pd.Series(dtype=object)
-        df_desc_name = strats[0].__class__.__name__ if strats and len(strats) == 1 else "Multiple Strategies"
-        if strats and len(strats) == 1:
-            for key, val in strats[0].p._getitems():
-                df_desc.loc[key]= strats[0].p._get(key)
-
         annual_trading_days = float(365 if df_eq.index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
         win_year = int(annual_trading_days)
@@ -340,20 +334,20 @@ class Statistics(object):
             self.graphs.append(fig)
 
 
-        ### Params ####
-        if strats and len(strats) == 1:
-            fig_params = go.Figure(data=[go.Table(
+        # Keep every strategy's parameters separate from the selected Eq metrics.
+        for index, strategy in enumerate(strats or ()):
+            description = pd.Series(strategy.p._getkwargs(), dtype=object)
+            label = type(strategy).__name__
+            if len(strats) > 1:
+                label += f" #{index + 1}"
+            figure = go.Figure(data=[go.Table(
                 header=dict(values=["Parameter", "Value"], fill_color='lightgray'),
-                cells=dict(values=[df_desc.index.tolist(), [str(val) for val in df_desc.values]],
-            	    align=["left", "right"],
-            	    font=dict(size=13),
-            	    height=26,
-            	    line_color='darkgray',
-            	    fill_color=[["#f0f0f0" if i % 2 == 0 else "rgb(244,255,255)" for i in range(len(df_desc))]],
-                ),
-            )])
-            fig_params.update_layout(title=f"Strategy [{df_desc_name}] Parameters", margin=dict(l=20, r=10, t=30, b=10), height=300, font=dict(size=12))
-            self.tables.append(fig_params)
+                cells=dict(values=[description.index.tolist(), [str(value) for value in description.values]],
+                           align=["left", "right"], font=dict(size=13), height=26,
+                           line_color='darkgray', fill_color='rgb(244,255,255)'))])
+            figure.update_layout(title=f"Strategy [{label}] Parameters",
+                                 margin=dict(l=20, r=10, t=30, b=10), height=300, font=dict(size=12))
+            self.tables.append(figure)
 
         ### Metrics ####
         fig_metrics = go.Figure(data=[go.Table(
