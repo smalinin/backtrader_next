@@ -106,8 +106,17 @@ class FuturesList():
 
     def switch_futures(self, strat: bt.Strategy = None) -> bool:
         """
-        Switch to next future, optionally closing current position on strat if provided 
-        and opening position on next future with same size and direction if there is an open position on current future.
+        Switch to the next future, optionally rolling over the current position.
+
+        The intended rollover policy preserves monetary exposure rather than
+        the number of contracts. The new position keeps the same direction,
+        and its monetary amount must not exceed that of the previous position,
+        with quantity rounded down to whole contracts.
+
+        The opening order is submitted without an explicit size, so the
+        strategy's configured sizer determines its quantity. The sizer is
+        responsible for applying the monetary limit; this method does not
+        calculate or enforce that limit itself.
 
         Args:
             strat (bt.Strategy, optional): The strategy instance to use for switching positions. Defaults to None.
