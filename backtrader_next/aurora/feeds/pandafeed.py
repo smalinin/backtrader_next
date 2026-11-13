@@ -67,7 +67,7 @@ import pandas as pd
 from datetime import datetime, date
 
 from backtrader_next import TimeFrame
-from backtrader_next.utils import date2num
+from backtrader_next.utils.arraydates import date2num_array
 from backtrader_next.utils.datefilters import filter_dataframe_dates
 
 from ..feed import AuroraDataBase
@@ -255,24 +255,8 @@ class AuroraPandasData(AuroraDataBase):
         if n_rows == 0:
             raise ValueError("DataFrame is empty after date filtering")
         
-        # Extract datetime values
-        if dt_col is None:
-            # Use index
-            if isinstance(df.index, pd.DatetimeIndex):
-                dt_values = df.index.to_pydatetime()
-            else:
-                # Try to convert to datetime
-                dt_values = pd.to_datetime(df.index).to_pydatetime()
-        else:
-            # Use column
-            dt_series = df.iloc[:, dt_col]
-            if hasattr(dt_series.dtype, 'tz'):
-                dt_values = dt_series.dt.to_pydatetime()
-            else:
-                dt_values = pd.to_datetime(dt_series).dt.to_pydatetime()
-        
-        # Convert datetime to numeric
-        dt_numeric = np.array([date2num(dt) for dt in dt_values], dtype=np.float64)
+        datetimes = df.index if dt_col is None else df.iloc[:, dt_col]
+        dt_numeric = date2num_array(pd.to_datetime(datetimes))
         
         # Extract OHLCV columns using fast .values access
         def extract_column(field_name):

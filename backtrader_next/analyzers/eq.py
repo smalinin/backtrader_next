@@ -80,7 +80,9 @@ class Eq(bt.Analyzer):
 
       - ``gen_orders(data_name=None)``
 
-        Returns order history as a pandas DataFrame.
+        Returns order execution history as a pandas DataFrame. Each row holds
+        a new fill's price and signed quantity, not cumulative order totals.
+        Partial fills of the same order share o_ref.
     '''
 
     params = (
@@ -150,11 +152,22 @@ class Eq(bt.Analyzer):
     def notify_order(self, order):
         if order.status not in [Order.Partial, Order.Completed]:
             return  # It's not an execution
-        self.orders.append([order.ref, order.data._name, order.data.datetime.datetime(),
-                            order.ordtype, order.executed.price, order.executed.size])
+        dt = order.data.datetime.datetime()
+        for fill in order.executed.iterpending():
+            if fill is None:
+                break
+            self.orders.append([order.ref, order.data._name, dt,
+                                order.ordtype, fill.price, fill.size])
 
     def gen_eq(self) -> 'DataFrame':
         if self.eq_df is not None:
+            return self.eq_df
+        if self.rets and all(isinstance(key, (int, float)) for key in self.rets):
+            from backtrader_next.utils.arraydates import num2datetime_array
+            times = num2datetime_array(np.fromiter(self.rets, dtype=np.float64))
+            self.eq_df = df([value[-2:] for value in self.rets.values()],
+                            index=pd.DatetimeIndex(times, name=self.rets_header[0]),
+                            columns=self.rets_header[1:])
             return self.eq_df
         from backtrader_next.utils.dateintern import num2date as _n2d
         # Keys in self.rets may be float (Aurora fast-path) or datetime (fallback)

@@ -25,7 +25,7 @@ import collections
 import datetime
 
 import backtrader_next as bt
-from backtrader_next.comminfo import CommInfoBase
+from backtrader_next.comminfo import CommInfoBase, CommissionInfo
 from backtrader_next.order import Order, BuyOrder, SellOrder
 from backtrader_next.position import Position
 from backtrader_next.utils.py3 import string_types, integer_types
@@ -281,6 +281,9 @@ class BackBroker(bt.BrokerBase):
         self._cash_addition = collections.deque()
         self._open_data = set()  # set of data feeds with non-zero positions
         self._comminfo_cache = {}  # per-data comminfo cache (immutable during run)
+        # Custom brokers/commission schemes retain the separate adjustment and
+        # valuation phases, including their callback order and side effects.
+        self._combine_value = type(self) is BackBroker
 
     def get_notification(self):
         try:
@@ -299,6 +302,8 @@ class BackBroker(bt.BrokerBase):
         except KeyError:
             ci = self.comminfo.get(data._name, self.comminfo[None])
             self._comminfo_cache[data] = ci
+            if type(ci) not in (CommInfoBase, CommissionInfo):
+                self._combine_value = False
             return ci
 
     def set_fundmode(self, fundmode, fundstartval=None):
@@ -432,12 +437,12 @@ class BackBroker(bt.BrokerBase):
     def get_value_lever(self, datas=None, mkt=False):
         return self.get_value(datas=datas, mkt=mkt)
 
-    def _get_value(self, datas=None, lever=False):
+    def _get_value(self, datas=None, lever=False, *, _mark_to_close=False):
         pos_value = 0.0
         pos_value_unlever = 0.0
         unrealized = 0.0
 
-        while self._cash_addition:
+        while self._cash_addition and not _mark_to_close:
             c = self._cash_addition.popleft()
             self._fundshares += c / self._fundval
             self.cash += c
@@ -462,6 +467,13 @@ class BackBroker(bt.BrokerBase):
                 continue
 
             price = data.close[0]
+
+            if _mark_to_close:
+                if comminfo._fast_value_path:
+                    self.cash += position.size * (price - position.adjbase) * comminfo._vp_mult
+                else:
+                    self.cash += comminfo.cashadjust(position.size, position.adjbase, price)
+                position.adjbase = price
 
             # Fast path: non-stocklike, fixed margin, leverage=1.0 (most common for futures)
             # Only active when called from broker.next() (datas=None), not from getvalue(data)
@@ -499,6 +511,14 @@ class BackBroker(bt.BrokerBase):
                 pos_value_unlever += dunrealized
             else:
                 pos_value_unlever += dvalue
+
+        # Deposits must follow all close adjustments, as in the separate-pass
+        # implementation. Keep the same floating-point cash update order.
+        if _mark_to_close:
+            while self._cash_addition:
+                c = self._cash_addition.popleft()
+                self._fundshares += c / self._fundval
+                self.cash += c
 
         if not self._fundhist:
             self._value = v = self.cash + pos_value_unlever
@@ -1305,6 +1325,10 @@ class BackBroker(bt.BrokerBase):
                     elif order.status == Order.Completed:
                         # a bracket parent order may have been executed
                         self._bracketize(order)
+
+        if self._open_data and self._combine_value:
+            self._get_value(_mark_to_close=True)
+            return
 
         # Mark remaining positions to close after executions. New and increased
         # positions use the execution price recorded in adjbase by _execute().

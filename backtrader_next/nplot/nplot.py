@@ -19,7 +19,7 @@ from backtrader_next.analyzers.eq import Eq
 from ..utils.py3 import with_metaclass
 from ..utils.date import format_datetime
 from ..lineiterator import IndicatorBase
-from .. import AutoInfoClass, MetaParams, date2num, num2date
+from .. import AutoInfoClass, MetaParams, Order, date2num, num2date
 from .nscheme import PlotScheme
 
 from bn_lightweight_charts.widgets import HTMLChart_BN
@@ -161,51 +161,38 @@ class Plot(with_metaclass(MetaParams, object)):
         return mask, np.asarray([num2date(value) for value in dates[mask]], dtype=object)
 
     def prepare_trades_list(self, data_name:str):
-        trades = self.performance.gen_trades(data_name, True) if self.performance else pd.DataFrame()
-        orders = self.performance.gen_orders(data_name) if self.performance else pd.DataFrame()
-        if orders.empty:
-            lst = []
-        elif trades.empty:
-            lst = orders.assign(ref=np.nan).to_dict(orient='records')
-        else:
-            df_lst = pd.merge(trades, orders, left_on='dateopen', right_on='o_datetime', how='outer')
-            lst = df_lst.to_dict(orient='records')
-        trades_lst = []
-        size = 0
-        for v in lst:
-            if size != 0:
-                o_size = v['o_size']
-                trades_lst.append({'type':1, 'o_ref':v['o_ref'], 'o_size':o_size,
-                                'o_datetime':format_datetime(v['o_datetime']),
-                                'o_price':v['o_price'], 'o_ordtype':v['o_ordtype']})
-                size_prev = size
-                size += o_size
-                if (size_prev < 0 and size > 0) or (size_prev > 0 and size < 0):
-                    trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
-                                    'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':f"{v['return_pct']:0.3f}" , 'dateopen': format_datetime(v['dateopen']),
-                                    'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
-                                    'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
-            else:
-                o_size = v['o_size']
-                if not np.isnan(v['ref']):
-                    trades_lst.append({'type':0, 'ref':v['ref'], 'tradeid':v['tradeid'],
-                                    'commission':v['commission'], 'pnl':v['pnl'], 'pnlcomm':v['pnlcomm'],
-                                    'return_pct':f"{v['return_pct']:0.3f}" , 'dateopen': format_datetime(v['dateopen']),
-                                    'dateclose':format_datetime(v['dateclose']), 'size':v['size'],
-                                    'barlen':v['barlen'], 'priceopen':v['priceopen'], 'priceclose':v['priceclose']})
-                else:
-                    trades_lst.append({'type':0, 'ref':'--', 'tradeid':'--',
-                                    'commission':'', 'pnl':'', 'pnlcomm':'',
-                                    'return_pct':'', 'dateopen': format_datetime(v['o_datetime']),
-                                    'dateclose':'--', 'size':v['o_size'],
-                                    'barlen':'', 'priceopen':v['o_price'], 'priceclose':''})
-
-                trades_lst.append({'type':1, 'o_ref':v['o_ref'], 'o_size':o_size,
-                                'o_datetime':format_datetime(v['o_datetime']),
-                                'o_price':v['o_price'], 'o_ordtype':v['o_ordtype']})
-                size += o_size
-        return trades_lst
+        if self.performance is None:
+            return []
+        # Trade.update already assigns every fill (including each side of a
+        # reversal) to its actual trade. Timestamps/tradeid need not be unique.
+        trades = [trade
+                  for data, histories in self.performance.strategy._trades.items()
+                  if data._name == data_name
+                  for history in histories.values()
+                  for trade in history if trade._execution_history]
+        trades.sort(key=lambda trade: (trade._execution_history[0].dt, trade.ref))
+        rows = []
+        for trade in trades:
+            fills = trade._execution_history
+            closed = trade.isclosed
+            rows.append({'type': 0, 'ref': trade.ref, 'tradeid': trade.tradeid,
+                         'commission': trade.commission,
+                         'pnl': trade.pnl if closed else '',
+                         'pnlcomm': trade.pnlcomm if closed else '',
+                         'return_pct': f'{trade.return_net_pct * 100:.3f}' if closed else '',
+                         'dateopen': format_datetime(trade.data.num2date(fills[0].dt)),
+                         'dateclose': format_datetime(trade.data.num2date(fills[-1].dt)) if closed else '--',
+                         'size': trade.peak_size * (1 if trade.long else -1),
+                         'barlen': trade.barlen if closed else len(trade.data) - trade.baropen,
+                         'priceopen': trade.priceopen,
+                         'priceclose': trade.priceclose if closed else ''})
+            for fill in fills:
+                rows.append({'type': 1, 'o_ref': fill.order_ref if fill.order_ref is not None else '--',
+                             'o_size': fill.size,
+                             'o_datetime': format_datetime(trade.data.num2date(fill.dt)),
+                             'o_price': fill.price,
+                             'o_ordtype': Order.Buy if fill.size > 0 else Order.Sell})
+        return rows
 
     def create_chart(self, c_top, filename):
         chart = HTMLChart_BN(width=1600, height=900,

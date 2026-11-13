@@ -8,8 +8,11 @@
 from dataclasses import dataclass
 from copy import deepcopy
 from functools import partial
+from io import BytesIO
 import itertools
 import multiprocessing
+from multiprocessing.reduction import ForkingPickler
+from pickle import Unpickler, loads
 import traceback
 from types import SimpleNamespace
 
@@ -189,6 +192,54 @@ def _execute_indexed_trial(engine, on_error, indexed_args):
     return index, result
 
 
+_worker_template = None
+_worker_on_error = None
+
+
+def _initialize_trial_worker(template, on_error):
+    """Transfer the configured engine/data once per process, not per trial."""
+    global _worker_template, _worker_on_error
+    _worker_template, _worker_on_error = template, on_error
+
+
+def _trial_references(engine):
+    return (engine, engine.broker, *engine.datas)
+
+
+class _TrialPickler(ForkingPickler):
+    def persistent_id(self, obj):
+        return self.references.get(id(obj))
+
+
+class _TrialUnpickler(Unpickler):
+    def persistent_load(self, key):
+        return self.references[key]
+
+
+def _encode_worker_trial(engine, indexed_args):
+    index, args = indexed_args
+    stream = BytesIO()
+    encoder = _TrialPickler(stream)
+    encoder.references = {id(obj): index for index, obj in enumerate(_trial_references(engine))}
+    encoder.dump(args)
+    return index, stream.getvalue()
+
+
+def _execute_worker_trial(indexed_payload):
+    index, payload = indexed_payload
+    try:
+        # Recreate the snapshot locally so input mutations, feed activation and
+        # failures cannot leak into the next trial handled by this process.
+        engine = loads(_worker_template)
+        decoder = _TrialUnpickler(BytesIO(payload))
+        decoder.references = _trial_references(engine)
+        args = decoder.load()
+        return _execute_indexed_trial(engine, _worker_on_error, (index, args))
+    except BaseException as error:
+        return index, _RaisedTrial(error, ''.join(traceback.format_exception(
+            type(error), error, error.__traceback__)))
+
+
 def _accept_result(engine, result, all_stats):
     if isinstance(result, _RaisedTrial):
         raise result.exception from _RemoteTraceback(result.traceback)
@@ -207,10 +258,14 @@ def _collect_trials(engine, strategy, combinations, maxcpus, on_error, descripti
     all_stats = []
     try:
         if maxcpus != 1 and len(args) > 1:
-            worker = partial(_execute_indexed_trial, engine, on_error)
             order = []
-            with multiprocessing.Pool(maxcpus or None) as pool:
-                with tqdm(pool.imap_unordered(worker, enumerate(args)), total=len(args),
+            # Serialize in the parent: an invalid configuration must raise here,
+            # rather than repeatedly crashing and respawning pool initializers.
+            template = bytes(ForkingPickler.dumps(engine))
+            with multiprocessing.Pool(maxcpus or None, initializer=_initialize_trial_worker,
+                                      initargs=(template, on_error)) as pool:
+                tasks = (_encode_worker_trial(engine, task) for task in enumerate(args))
+                with tqdm(pool.imap_unordered(_execute_worker_trial, tasks), total=len(args),
                           desc=description + ' (parallel)') as results:
                     for index, result in results:
                         if _accept_result(engine, result, all_stats):

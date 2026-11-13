@@ -29,7 +29,8 @@ from .utils.date import num2date
 
 
 TradeExecution = namedtuple('TradeExecution',
-                           'dt size price position_size position_price pnl mult timing')
+                           'dt size price position_size position_price pnl mult timing order_ref',
+                           defaults=(None,))
 
 
 class TradeHistory(AutoOrderedDict):
@@ -356,7 +357,7 @@ class Trade(object):
         execution_dt = self.data.datetime[0] if dt is None else dt
         self._execution_history.append(TradeExecution(
             execution_dt, size, price, self.size, self.price, self.pnl,
-            comminfo.p.mult, timing))
+            comminfo.p.mult, timing, getattr(order, 'ref', None)))
 
         # Update the history if needed
         if self.historyon:
