@@ -28,11 +28,13 @@ class Eq(bt.Analyzer):
 
       - ``data`` (default: ``None``)
 
-        Specific data feed to analyze. If ``None``, all data is analyzed.
+        Specific data feed whose position value is recorded. If ``None``,
+        record the total portfolio or fund value. Position valuation follows
+        the broker's ``get_value(datas=[feed])`` semantics.
 
       - ``cash`` (default: ``True``)
 
-        Whether to include cash information in equity tracking.
+        Include the broker's free cash as a separate column in equity tracking.
 
     Methods:
 
@@ -124,7 +126,9 @@ class Eq(bt.Analyzer):
         if self.p.data is None:
             pvals.append(self._value)
         else:
-            pvals.append(self.strategy.broker.get_value(self.p.data))
+            # A feed is itself iterable; keep it inside a broker data selection.
+            datas = self.p.data if isinstance(self.p.data, (list, tuple)) else [self.p.data]
+            pvals.append(self.strategy.broker.get_value(datas=datas))
 
         if self.p.cash:
             pvals.append(self._cash)
