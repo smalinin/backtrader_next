@@ -118,6 +118,10 @@ class AuroraLines:
         data (np.ndarray): Shared 2D array [rows x columns]
         _idx (int): Current position index (shared by ALL lines)
         lines (list): List of AuroraLineBufferView objects
+
+    Standalone containers can resize while retaining existing line objects.
+    Containers attached to preloaded feeds have a fixed shape; operations that
+    would resize their matrix raise RuntimeError.
     """
     
     # Default line names for OHLCV data
@@ -244,6 +248,19 @@ class AuroraLines:
     def home(self):
         """Reset index to beginning."""
         self._idx = -1
+
+    def _check_resize(self):
+        if getattr(self, '_feed_ref', None) is not None:
+            raise RuntimeError(
+                'Cannot resize preloaded feed lines; reset and reload the feed instead')
+
+    def _replace_data(self, data):
+        """Retain line objects and their bindings when replacing the matrix."""
+        self.data = data
+        length = len(data)
+        for line in self.lines:
+            line.parent_array = data
+            line._array_len = length
     
     def forward(self, value=NAN, size=1):
         """
@@ -257,11 +274,12 @@ class AuroraLines:
         current_len = len(self.data)
         
         if new_idx >= current_len:
+            self._check_resize()
             # Need to extend array
             extend_size = new_idx - current_len + 1
             new_rows = np.full((extend_size, self.data.shape[1]), 
                              value, dtype=np.float64)
-            self.data = np.vstack([self.data, new_rows])
+            self._replace_data(np.vstack([self.data, new_rows]))
         
         self._idx = new_idx
     
@@ -272,10 +290,12 @@ class AuroraLines:
         Args:
             size (int): Number of positions to move back
         """
-        self._idx -= size
+        new_idx = self._idx - size
         # Optionally trim array
-        if self._idx + 1 < len(self.data) - size:
-            self.data = self.data[:self._idx + 1]
+        if new_idx + 1 < len(self.data) - size:
+            self._check_resize()
+            self._replace_data(self.data[:new_idx + 1])
+        self._idx = new_idx
     
     def rewind(self, size=1):
         """
@@ -304,14 +324,16 @@ class AuroraLines:
             size (int): Number of rows to add
         """
         if size > 0:
+            self._check_resize()
             new_rows = np.full((size, self.data.shape[1]), 
                              value, dtype=np.float64)
-            self.data = np.vstack([self.data, new_rows])
+            self._replace_data(np.vstack([self.data, new_rows]))
     
     def reset(self):
         """Reset to initial empty state."""
+        self._check_resize()
         n_lines = len(self._linenames)
-        self.data = np.empty((0, n_lines), dtype=np.float64)
+        self._replace_data(np.empty((0, n_lines), dtype=np.float64))
         self._idx = -1
     
     def get_array(self, line=0, nlast=0):
