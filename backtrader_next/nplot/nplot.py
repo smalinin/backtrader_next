@@ -365,6 +365,7 @@ class Plot(with_metaclass(MetaParams, object)):
         self.dplots_up = collections.defaultdict(list)
         self.dplots_down = collections.defaultdict(list)
         self.dplots_over = collections.defaultdict(list)
+        parents = {}
 
         # Sort indicators in the different lists/dictionaries
         for x in strategy.getindicators():
@@ -387,6 +388,7 @@ class Plot(with_metaclass(MetaParams, object)):
             except ValueError as error:
                 raise ValueError(f'Cannot resolve plotting clock for {type(x).__name__}: {error}') from error
 
+            parents[id(x)] = (x, key)
             if x.plotinfo.subplot and xpmaster is None:
                 if x.plotinfo.plotabove:
                     self.dplots_up[key].append(x)
@@ -394,3 +396,20 @@ class Plot(with_metaclass(MetaParams, object)):
                     self.dplots_down[key].append(x)
             else:
                 self.dplots_over[key].append(x)
+
+        # Check every component: cycles disconnected from feeds never reach
+        # _indicator_panels(). Use identities to avoid indicator comparisons.
+        checked = set()
+        for indicator, _ in parents.values():
+            path, positions = [], {}
+            node = indicator
+            while id(node) in parents and id(node) not in checked:
+                node_id = id(node)
+                if node_id in positions:
+                    cycle = path[positions[node_id]:] + [node]
+                    names = ' -> '.join(type(item).__name__ for item in cycle)
+                    raise ValueError(f'Cyclic indicator plot hierarchy: {names}')
+                positions[node_id] = len(path)
+                path.append(node)
+                node = parents[node_id][1]
+            checked.update(positions)
