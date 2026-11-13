@@ -63,21 +63,22 @@ class Aurora(with_metaclass(MetaParams, object)):
     
     **Params:**
     
-      - ``preload`` (default: ``True``) - Always True, data is preloaded
+      - ``preload`` (default: ``True``) - Must be True; data is preloaded
       
-      - ``runonce`` (default: ``True``) - Always True, vectorized mode only
+      - ``runonce`` (default: ``True``) - Must be True; vectorized mode only
       
-      - ``stdstats`` (default: ``False``) - Add standard observers (Broker, Trades, BuySell)
+      - ``stdstats`` (default: ``False``) - Must be False; automatic standard
+        observers are not supported
       
       - ``stats`` (default: ``True``) - Create a fresh Eq named ``eq`` per
         strategy/run unless already registered; keep engine configuration
         unchanged. Explicit analyzers are retained when stats is False.
       
-      - ``lookahead`` (default: ``0``) - Lookahead bars for indicators
+      - ``lookahead`` (default: ``0``) - Must be 0; extra buffers are unsupported
       
-      - ``tz`` (default: ``None``) - Global timezone for strategies
+      - ``tz`` (default: ``None``) - Must be None; no engine timezone conversion
       
-      - ``maxcpus`` (default: ``None``) - Maximum CPU cores for optimization (None = all cores)
+      - ``maxcpus`` (default: ``1``) - Maximum CPU cores for optimization (None = all cores)
       
       - ``optdatas`` (default: ``True``) - Optimize data handling in multiprocessing mode
     '''
@@ -85,10 +86,10 @@ class Aurora(with_metaclass(MetaParams, object)):
     params = (
         ('preload', True),          # Always True
         ('runonce', True),          # Always True  
-        ('stdstats', False),        # Standard observers
+        ('stdstats', False),        # Automatic standard observers unsupported
         ('stats', True),            # Eq analyzer
-        ('lookahead', 0),           # Lookahead bars
-        ('tz', None),               # Global timezone
+        ('lookahead', 0),           # Extra lookahead buffers unsupported
+        ('tz', None),               # Engine timezone conversion unsupported
         ('quicknotify', False),     # Quick broker notifications
         ('maxcpus', 1),             # Maximum CPUs for optimization (1=single, 2/3/4/...=multi, None=all cores)
         ('optdatas', True),         # Optimize data in multiprocessing
@@ -101,6 +102,8 @@ class Aurora(with_metaclass(MetaParams, object)):
         Args:
             broker: Broker instance (default: BackBroker). Only backtesting brokers supported.
         '''
+        self._validate_parameters(self.p._getkwargs())
+
         # Data management
         self.datas = list()
         self.datasbyname = collections.OrderedDict()
@@ -135,6 +138,19 @@ class Aurora(with_metaclass(MetaParams, object)):
         # Strategy counter (for _id assignment)
         self._init_stcount()
     
+    @staticmethod
+    def _validate_parameters(parameters):
+        required = (
+            ('preload', True), ('runonce', True), ('stdstats', False),
+            ('lookahead', 0), ('tz', None),
+        )
+        for name, expected in required:
+            value = parameters[name]
+            unsupported = value is not None if expected is None else value != expected
+            if unsupported:
+                raise ValueError('Aurora supports only {}={!r}; got {!r}'.format(
+                    name, expected, value))
+
     def _init_stcount(self):
         """Initialize strategy counter"""
         self.stcount = 0
@@ -437,7 +453,8 @@ class Aurora(with_metaclass(MetaParams, object)):
         This is the main method that runs all strategies with all data feeds.
         
         Args:
-            **kwargs: Override default parameters (preload, runonce, etc.)
+            **kwargs: Override declared engine parameters. Unsupported values
+                and unknown names are rejected before starting resources.
             
         Returns:
             List[Strategy]: List of executed strategy instances with results
@@ -449,15 +466,20 @@ class Aurora(with_metaclass(MetaParams, object)):
             >>> results = aurora.run()
             >>> print(results[0].analyzers.sharpe.get_analysis())
         '''
-        # Validate that we have data
+        parameters = self.params._getkwargs()
+        unknown = set(kwargs).difference(parameters)
+        if unknown:
+            raise TypeError('Unknown Aurora.run() parameter(s): {}'.format(
+                ', '.join(sorted(unknown))))
+        parameters.update(kwargs)
+        self._validate_parameters(parameters)
+
+        # Apply a valid batch atomically, including when no data is attached yet.
+        for key, val in kwargs.items():
+            setattr(self.params, key, val)
+
         if not self.datas:
             return []
-        
-        # Override parameters if provided
-        pkeys = self.params._getkeys()
-        for key, val in kwargs.items():
-            if key in pkeys:
-                setattr(self.params, key, val)
         
         # Ensure we have at least one strategy
         if not self.strats:
@@ -549,6 +571,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         broker_stops = []
         try:
             with CleanupOnExit(itertools.chain(strategy_stops, data_stops, broker_stops)):
+                self._validate_parameters(self.p._getkwargs())
                 # Register shutdown before startup to cover partial initialization.
                 broker_stops.append(self._broker.stop)
                 self._broker.start()
@@ -1017,6 +1040,7 @@ class Aurora(with_metaclass(MetaParams, object)):
             ...     return_heatmap=True
             ... )
         '''
+        self._validate_parameters(self.p._getkwargs())
         return _optimization.optimize(
             self, strategy, method, maximize, constraint, max_tries, random_state,
             return_heatmap, return_optimization, maxcpus, on_error, params)
