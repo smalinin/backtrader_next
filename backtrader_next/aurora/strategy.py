@@ -11,8 +11,8 @@ class AuroraStrategy(Strategy):
     """Use Strategy's trading and lifecycle APIs with Aurora feeds/indicators.
 
     Native indicators follow preloaded feed cursors and need explicit value
-    checks. Standard graphs have per-feed warmup; their public bt.ind.* and
-    bt.nind.* input adapters remain unsupported.
+    checks. Standard runonce graphs use StandardData(feed) and per-feed warmup.
+    Direct native feed/line inputs to standard indicators remain unsupported.
     See docs/aurora/README.md for strategy and order examples.
     """
 

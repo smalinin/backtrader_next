@@ -1,4 +1,4 @@
-"""Standard line interfaces over Aurora input storage.
+"""StandardData: standard line interfaces over Aurora input storage.
 
 Aurora calculates standard dependency graphs after preloading and advances
 their output cursors by clock. Automatic public input adaptation remains
@@ -95,9 +95,12 @@ class _StandardLines(OHLCDateTime.lines):
         self._feed.home()
 
 
-class _StandardData(OHLCDateTime):
-    """Internal close-first facade; the feed keeps its datetime-first rows.
+class StandardData(OHLCDateTime):
+    """A close-first indicator view over an Aurora feed's storage and cursor.
 
+    Construct a view in each strategy's __init__, then pass it or its lines to
+    standard runonce indicators. Expressions and delays use standard operators.
+    Use the original Aurora feed for orders and broker position selection.
     May be constructed before preloading. Column views resolve from the feed
     on access, so a subsequent reload does not leave stale NumPy references.
     Only the cursor is reset by home()/reset(); input arrays are fixed-size.

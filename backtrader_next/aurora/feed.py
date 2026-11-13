@@ -56,9 +56,9 @@ Exposes selected backtrader-style DataBase methods:
 - advance(), home(), forward(), rewind()
 - Indexing: data[0] (current), data[-1] (previous)
 
-The shared NumPy index and line views differ from Cerebro's data buffers.
-This interface subset does not provide standard-indicator compatibility;
-use indicators from backtrader_next.aurora.indicators.
+The shared NumPy index and native line views differ from Cerebro's data
+buffers. Use StandardData(feed) for standard runonce indicator inputs, or
+pass this feed directly to backtrader_next.aurora.indicators.
 
 Usage:
 ------

@@ -54,8 +54,8 @@ class Aurora(with_metaclass(MetaParams, object)):
     - No replay/resample modes
     - No runnext mode (always runonce)
     - Simplified timer API
-    - Standard bt.ind.* and bt.nind.* indicators are not supported
-    - Use AuroraStrategy, Aurora feeds, and aurora.indicators.*
+    - Standard indicators require an explicit StandardData(feed) input view
+    - Use AuroraStrategy and Aurora feeds; stepping-only indicators are unsupported
 
     Existing Cerebro strategies require adaptation. Similar method names do
     not imply support for Cerebro's complete indicator or execution lifecycle.
