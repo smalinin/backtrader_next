@@ -609,11 +609,19 @@ class Aurora(with_metaclass(MetaParams, object)):
         Args:
             runstrats: List of strategy instances to execute
         '''
-        # Step 1: Reset Aurora data feeds to beginning (use home() to keep data!)
+        # Use the standard dependency calculation for registered graphs. Native
+        # indicators are separate and need no standard buffer allocation.
+        for strat in runstrats:
+            if strat._ind_iterator:
+                strat._once()
+
+        # Calculation (including next-only fallbacks) can move shared inputs.
+        # Rewind every feed after all strategies have prepared their graphs.
         for data in self.datas:
-            data.home()  # Reset position only, keep loaded data
-        
-        # Step 2: Initialize strategies
+            data.home()
+
+        # Preserve the native path's feed-home-before-strategy-reset ordering.
+        # Only strategy buffers are cleared; calculated indicator arrays stay.
         for strat in runstrats:
             strat.reset()
         

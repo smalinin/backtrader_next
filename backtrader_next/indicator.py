@@ -97,11 +97,24 @@ class Indicator(with_metaclass(MetaIndicator, IndicatorBase)):
         if len(self) < len(self._clock):
             self.lines.advance(size=size)
 
+    def _once_data_advances(self):
+        # Prepare navigation once per phase, outside the per-bar fallback.
+        # Several array input lines may point at one authoritative cursor.
+        cursors = set()
+        advances = []
+        for data in self.datas:
+            cursor = id(getattr(data, '_once_cursor', data))
+            if cursor not in cursors:
+                cursors.add(cursor)
+                advances.append(data.advance)
+        return advances
+
     def preonce_via_prenext(self, start, end):
         # generic implementation if prenext is overridden but preonce is not
+        advances = self._once_data_advances()
         for i in range(start, end):
-            for data in self.datas:
-                data.advance()
+            for advance in advances:
+                advance()
 
             for indicator in self._ind_iterator:
                 indicator.advance()
@@ -112,9 +125,10 @@ class Indicator(with_metaclass(MetaIndicator, IndicatorBase)):
     def oncestart_via_nextstart(self, start, end):
         # nextstart has been overriden, but oncestart has not and the code is
         # here. call the overriden nextstart
+        advances = self._once_data_advances()
         for i in range(start, end):
-            for data in self.datas:
-                data.advance()
+            for advance in advances:
+                advance()
 
             for indicator in self._ind_iterator:
                 indicator.advance()
@@ -124,9 +138,10 @@ class Indicator(with_metaclass(MetaIndicator, IndicatorBase)):
 
     def once_via_next(self, start, end):
         # Not overridden, next must be there ...
+        advances = self._once_data_advances()
         for i in range(start, end):
-            for data in self.datas:
-                data.advance()
+            for advance in advances:
+                advance()
 
             for indicator in self._ind_iterator:
                 indicator.advance()

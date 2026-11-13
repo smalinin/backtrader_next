@@ -1,7 +1,7 @@
 """Standard line interfaces over Aurora input storage.
 
-This is the data-side adapter for the standard indicator lifecycle. Aurora's
-executor does not yet calculate or advance standard indicator output buffers.
+Aurora calculates standard dependency graphs after preloading. Per-bar output
+advancement and the public input adapters are separate integration steps.
 """
 
 from backtrader_next.dataseries import OHLCDateTime
@@ -43,6 +43,10 @@ class _StandardLine(LineBuffer):
     @property
     def lencount(self):
         return len(self._clock)
+
+    @property
+    def _once_cursor(self):
+        return self._clock
 
     def home(self):
         self._clock.home()
@@ -126,6 +130,10 @@ class _StandardData(OHLCDateTime):
     @property
     def _tz(self):
         return self._clock._tz
+
+    @property
+    def _once_cursor(self):
+        return self._clock
 
     @property
     def is_on(self):

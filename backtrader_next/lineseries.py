@@ -616,6 +616,14 @@ class LineSeriesStub(LineSeries):
         """Forward is_on attribute from owner if it exists (for Aurora data feeds)"""
         return getattr(self._owner, 'is_end', True)
 
+    @property
+    def _once_cursor(self):
+        # Array-backed input lines can share a single feed cursor. Ordinary
+        # buffers retain their independent navigation through this wrapper.
+        if self.slave:
+            return self  # a no-op must not suppress a cursor's actual owner
+        return getattr(self.lines[0], '_once_cursor', self)
+
     # Only execute the operations below if the object is not a slave
     def forward(self, value=NAN, size=1):
         if not self.slave:
