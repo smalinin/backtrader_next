@@ -9,7 +9,6 @@ Aurora data feeds and indicators from backtrader_next.aurora.indicators;
 standard bt.ind.* and bt.nind.* indicators are not supported.
 """
 
-import backtrader_next as bt
 from backtrader_next.strategy import Strategy
 
 from ._lifecycle import CleanupOnExit
@@ -20,7 +19,7 @@ class AuroraStrategy(Strategy):
     Base strategy class optimized for Aurora backtesting engine.
     
     This class extends backtrader_next.Strategy with Aurora-specific execution.
-    It retains trading methods such as buy(), sell(), close(), and cancel(),
+    It inherits trading methods such as buy(), sell(), close(), and cancel(),
     and runs with Aurora's vectorized data feeds and indicator implementations.
     
     Key Features:
@@ -238,17 +237,6 @@ class AuroraStrategy(Strategy):
         with CleanupOnExit(stops):
             self.stop()
 
-    def clear(self):
-        """
-        Aurora-optimized clear: reuses list objects instead of allocating new ones.
-        Saves ~452,910 list allocations per run (2 per bar × 226,455 bars).
-        """
-        if self._orderspending:
-            self._orders.extend(self._orderspending)
-            self._orderspending.clear()
-        if self._tradespending:
-            self._tradespending.clear()
-
     # Lifecycle methods - maintain compatibility with backtrader.Strategy
     # These are already implemented in Strategy base class, but documented here
     # for clarity in Aurora context
@@ -340,178 +328,15 @@ class AuroraStrategy(Strategy):
         """
         pass
     
-    # Trading methods - inherited from Strategy, documented for Aurora context
-    
-    def buy(self, data=None, size=None, price=None, plimit=None,
-            exectype=None, valid=None, tradeid=0, oco=None,
-            trailamount=None, trailpercent=None,
-            parent=None, transmit=True, **kwargs):
-        """
-        Create a buy (long) order and send it to the broker.
-        
-        Args:
-            data: Data feed to trade (default: self.data)
-            size: Position size in units (default: from sizer)
-            price: Limit/stop price (default: None for market orders)
-            plimit: Limit price for StopLimit orders
-            exectype: Order type (Market, Limit, Stop, StopLimit, Close)
-            valid: Order validity (None=GTC, datetime, Order.DAY)
-            tradeid: Internal trade tracking ID
-            oco: Link to OCO (One-Cancels-Other) group
-            trailamount: Trailing stop distance (absolute)
-            trailpercent: Trailing stop distance (percentage)
-            parent: Parent order for bracket orders
-            transmit: Transmit immediately (default: True)
-            **kwargs: Additional broker-specific parameters
-        
-        Returns:
-            Order instance or None if size is 0
-        
-        Example:
-            ```python
-            # Market order with auto-sizing
-            self.buy()
-            
-            # Limit order with specific size
-            self.buy(size=100, price=50.0, exectype=bt.Order.Limit)
-            
-            # Stop order
-            self.buy(price=52.0, exectype=bt.Order.Stop)
-            ```
-        """
-        return super(AuroraStrategy, self).buy(
-            data=data, size=size, price=price, plimit=plimit,
-            exectype=exectype, valid=valid, tradeid=tradeid, oco=oco,
-            trailamount=trailamount, trailpercent=trailpercent,
-            parent=parent, transmit=transmit, **kwargs
-        )
-    
-    def sell(self, data=None, size=None, price=None, plimit=None,
-             exectype=None, valid=None, tradeid=0, oco=None,
-             trailamount=None, trailpercent=None,
-             parent=None, transmit=True, **kwargs):
-        """
-        Create a sell (short) order and send it to the broker.
-        
-        Args: Same as buy()
-        
-        Returns:
-            Order instance or None if size is 0
-        
-        Example:
-            ```python
-            # Market sell order
-            self.sell()
-            
-            # Limit sell order
-            self.sell(size=50, price=55.0, exectype=bt.Order.Limit)
-            ```
-        """
-        return super(AuroraStrategy, self).sell(
-            data=data, size=size, price=price, plimit=plimit,
-            exectype=exectype, valid=valid, tradeid=tradeid, oco=oco,
-            trailamount=trailamount, trailpercent=trailpercent,
-            parent=parent, transmit=transmit, **kwargs
-        )
-    
-    def close(self, data=None, size=None, **kwargs):
-        """
-        Close existing position (counter-trade).
-        
-        Automatically determines whether to buy or sell based on current position.
-        If long, creates a sell order. If short, creates a buy order.
-        
-        Args:
-            data: Data feed to close position for (default: self.data)
-            size: Size to close (default: entire position)
-            **kwargs: Additional order parameters (see buy/sell)
-        
-        Returns:
-            Order instance or None if no position
-        
-        Example:
-            ```python
-            # Close entire position
-            self.close()
-            
-            # Partially close position
-            self.close(size=50)
-            ```
-        """
-        return super(AuroraStrategy, self).close(data=data, size=size, **kwargs)
-    
-    def cancel(self, order):
-        """
-        Cancel a pending order.
-        
-        Args:
-            order: Order instance to cancel
-        
-        Example:
-            ```python
-            def next(self):
-                if self.order:  # Have pending order
-                    if some_condition:
-                        self.cancel(self.order)
-                        self.order = None
-            ```
-        """
-        return super(AuroraStrategy, self).cancel(order)
-    
-    # Properties - inherited from Strategy
-    
     @property
     def position(self):
         """
-        Current position for default data feed.
-        
-        Returns:
-            Position instance with attributes:
-            - size: Position size (positive=long, negative=short, 0=flat)
-            - price: Average entry price
-            - adjbase: Adjusted base for P&L calculation
-        
-        Example:
-            ```python
-            def next(self):
-                pos = self.position
-                if pos.size > 0:
-                    print(f"Long {pos.size} units at {pos.price}")
-                elif pos.size < 0:
-                    print(f"Short {abs(pos.size)} units at {pos.price}")
-                else:
-                    print("Flat (no position)")
-            ```
+        Return the default position through the strategy's getposition().
+
+        Keep dynamic dispatch for subclasses overriding getposition; the
+        base Strategy property is bound directly to Strategy.getposition.
         """
         return self.getposition()
-    
-    # Utility methods for multi-data strategies
-    
-    def getposition(self, data=None, broker=None):
-        """
-        Get position for specific data feed.
-        
-        Args:
-            data: Data feed (default: self.data)
-            broker: Broker instance (default: self.broker)
-        
-        Returns:
-            Position instance
-        """
-        return super(AuroraStrategy, self).getposition(data=data, broker=broker)
-    
-    def getpositionbyname(self, name=None, broker=None):
-        """
-        Get position by data feed name.
-        
-        Args:
-            name: Data feed name (default: first data)
-            broker: Broker instance (default: self.broker)
-        
-        Returns:
-            Position instance
-        """
-        return super(AuroraStrategy, self).getpositionbyname(name=name, broker=broker)
     
     # Aurora-specific utility methods
     
