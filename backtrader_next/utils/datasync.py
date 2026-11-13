@@ -40,6 +40,7 @@ class _IndicatorSchedule:
         from ..indicator import Indicator
         from ..linebuffer import LineBuffer
         from ..lineseries import LineSeries, Lines
+        from ..aurora._standard import _StandardLine
 
         def length_reader(source):
             # LineSeries -> Lines -> LineBuffer are pure length proxies.
@@ -47,7 +48,10 @@ class _IndicatorSchedule:
             if (type(source).__len__ is LineSeries.__len__
                     and type(source.lines).__len__ is Lines.__len__
                     and type(source.lines[0]).__len__ is LineBuffer.__len__):
-                return source.lines[0].__len__, True
+                line = source.lines[0]
+                if type(line) is _StandardLine:
+                    return partial(len, line._clock), True
+                return line.__len__, True
             return partial(len, source), False
 
         nodes = _indicator_graph(owner)

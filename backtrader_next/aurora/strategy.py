@@ -33,10 +33,18 @@ class AuroraStrategy(Strategy):
         # Use actual feed clocks; dts follows the engine's sorted feed order.
         # An is_end feed is disabled before dispatch but still supplies its
         # final bar. Other inactive feeds do not delay the active instruments.
-        deficits = [period - len(data)
-                    for data, period in zip(self.datas, self._minperiods)
-                    if data.is_on or (len(data) and data.datetime[0] == dt0)]
-        status = max(deficits, default=1)
+        if len(self.datas) == 1:
+            data = self.data0
+            if data.is_on or (len(data) and data.datetime[0] == dt0):
+                status = self._minperiods[0] - len(data)
+                deficits = [status]
+            else:
+                status, deficits = 1, []
+        else:
+            deficits = [period - len(data)
+                        for data, period in zip(self.datas, self._minperiods)
+                        if data.is_on or (len(data) and data.datetime[0] == dt0)]
+            status = max(deficits, default=1)
         if status <= 0:
             # Equality can persist for several bars of another feed, and late
             # activation can jump directly past zero. nextstart is still once.
@@ -79,6 +87,10 @@ class AuroraStrategy(Strategy):
         # analyzers from closing or leave data in the execution stage.
         stops = [analyzer._stop for analyzer in self.analyzers]
         stops.extend(analyzer._stop for analyzer in self._slave_analyzers)
+        stops.append(self._clear_execution_schedule)
         stops.append(self._stage1)
         with CleanupOnExit(stops):
             self.stop()
+
+    def _clear_execution_schedule(self):
+        self.__dict__.pop('_execution_schedule', None)

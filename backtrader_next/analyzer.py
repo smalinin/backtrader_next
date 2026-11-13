@@ -29,6 +29,7 @@ import pprint as pp
 import backtrader_next as bt
 from backtrader_next import TimeFrame
 from backtrader_next.utils.py3 import MAXINT, with_metaclass
+from .utils.notifications import invalidate_strategy_schedule
 
 
 class MetaAnalyzer(bt.MetaParams):
@@ -144,6 +145,7 @@ class Analyzer(with_metaclass(MetaAnalyzer, object)):
 
     def _register(self, child):
         self._children.append(child)
+        invalidate_strategy_schedule(self.strategy)
 
     def _prenext(self):
         for child in self._children:

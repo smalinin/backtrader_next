@@ -23,6 +23,7 @@ from __future__ import (absolute_import, division, print_function, unicode_liter
 
 from .lineiterator import LineIterator, ObserverBase, StrategyBase
 from backtrader_next.utils.py3 import with_metaclass
+from .utils.notifications import invalidate_strategy_schedule
 
 
 class MetaObserver(ObserverBase.__class__):
@@ -61,6 +62,7 @@ class Observer(with_metaclass(MetaObserver, ObserverBase)):
         # Children receive lifecycle calls recursively through their parent.
         if analyzer._parent is None:
             self._analyzers.append(analyzer)
+            invalidate_strategy_schedule(self._owner)
 
     def _start(self):
         self.start()

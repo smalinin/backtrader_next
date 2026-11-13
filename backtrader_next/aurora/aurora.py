@@ -33,7 +33,7 @@ from ..utils.py3 import with_metaclass, string_types
 from ..brokers import BackBroker
 from ..utils import OrderedDict
 from ..utils.datasync import DataSynchronizer, home_indicators, prepare_indicator_schedule
-from ..utils.notifications import notify_broker
+from ..utils.notifications import notify_broker, prepare_strategy_schedule
 from ..nplot.utils import gen_timestamp
 from ._lifecycle import CleanupOnExit
 
@@ -622,6 +622,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         with DataSynchronizer(self, runstrats) as synchronizer:
             for strat in runstrats:
                 prepare_indicator_schedule(strat)
+                prepare_strategy_schedule(strat)
             self._runonce_loop(runstrats, synchronizer)
 
     def _runonce_loop(self, runstrats, synchronizer):

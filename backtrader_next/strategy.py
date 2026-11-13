@@ -65,6 +65,7 @@ from .metabase import ItemCollection, findowner
 from .trade import Trade
 from .utils import OrderedDict, AutoOrderedDict, AutoDictList
 from .utils.datasync import advance_indicators
+from .utils.notifications import invalidate_strategy_schedule, strategy_analyzers
 
 
 class MetaStrategy(StrategyBase.__class__):
@@ -302,6 +303,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         analyzer = ancls(*anargs, **ankwargs)
         if analyzer._parent is None:
             self._slave_analyzers.append(analyzer)
+            invalidate_strategy_schedule(self)
         return analyzer
 
     def _getanalyzer_slave(self, idx):
@@ -313,6 +315,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         anname += str(nsuffix or '')  # 0 (first instance) gets no suffix
         analyzer = ancls(*anargs, **ankwargs)
         self.analyzers.append(analyzer, anname)
+        invalidate_strategy_schedule(self)
 
     def _addobserver(self, multi, obscls, *obsargs, **obskwargs):
         obsname = obskwargs.pop('obsname', '')
@@ -323,6 +326,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             newargs = list(itertools.chain(self.datas, obsargs))
             obs = obscls(*newargs, **obskwargs)
             self.stats.append(obs, obsname)
+            invalidate_strategy_schedule(self)
             return
 
         l = list()
@@ -331,6 +335,7 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         for data in self.datas:
             obs = obscls(data, *obsargs, **obskwargs)
             l.append(obs)
+        invalidate_strategy_schedule(self)
 
     def _getminperstatus(self):
         # check the min period status connected to datas
@@ -469,12 +474,9 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
     def _next_analyzers(self, minperstatus, once=False):
         # Observer-owned roots run immediately before their observer. Other
         # slave analyzers follow the strategy, just like explicitly added ones.
-        seen = {id(analyzer) for observer in self._obs_iterator
-                for analyzer in observer._analyzers}
-        for analyzer in itertools.chain(self.analyzers, self._slave_analyzers):
-            if id(analyzer) in seen or analyzer._parent is not None:
-                continue
-            seen.add(id(analyzer))
+        schedule = self.__dict__.get('_execution_schedule')
+        analyzers = schedule.analyzers if schedule is not None else strategy_analyzers(self)
+        for analyzer in analyzers:
             if minperstatus < 0:
                 analyzer._next()
             elif minperstatus == 0:
@@ -706,6 +708,15 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         value = self.broker.getvalue()
         fundvalue = self.broker.fundvalue
         fundshares = self.broker.fundshares
+
+        schedule = self.__dict__.get('_execution_schedule')
+        if schedule is not None:
+            for is_fund, callback in schedule.fund_callbacks:
+                if is_fund:
+                    callback(cash, value, fundvalue, fundshares)
+                else:
+                    callback(cash, value)
+            return
 
         self.notify_cashvalue(cash, value)
         self.notify_fund(cash, value, fundvalue, fundshares)
