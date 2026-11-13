@@ -47,6 +47,9 @@ class Eq(bt.Analyzer):
         - Trade statistics: Win Rate, Best/Worst/Avg Trade, # of Trades
         - Performance ratios: Calmar Ratio, VWR Ratio, Profit Factor, Profit Factor [eq], SQN, Kelly Criterion
 
+        Without daily drawdowns, drawdown magnitude and duration are zero,
+        and Drawdown Peak is NaT. Ratios requiring a nonzero drawdown remain NaN.
+
       - ``gen_eq()``
 
         Returns equity curve as a pandas DataFrame with datetime index.
@@ -304,14 +307,16 @@ class Eq(bt.Analyzer):
         s.loc['Recovery factor [%]'] = round(total_return / abs(max_dd) * 100, 4) if abs(max_dd) != 0 else np.nan
 
         s.loc['Max. Drawdown [%]'] = round(max_dd, 4)
-        s.loc['Avg. Drawdown [%]'] = round(-dd_peaks.mean(), 4)
-        dd_dur_max = dd_dur.max()
+        dd_dur = dd_dur.dropna()
+        dd_peaks = dd_peaks.dropna()
+        s.loc['Avg. Drawdown [%]'] = round(-dd_peaks.mean(), 4) if not dd_peaks.empty else 0.0
+        dd_dur_max = dd_dur.max() if not dd_dur.empty else pd.Timedelta(0)
         s.loc['Max. Drawdown Duration'] = _round_timedelta(dd_dur_max)
         s.loc['Max. Drawdown Duration [D]'] = round(dd_dur_max.total_seconds() / 86400, 4)
-        dd_dur_mean = dd_dur.mean()
+        dd_dur_mean = dd_dur.mean() if not dd_dur.empty else pd.Timedelta(0)
         s.loc['Avg. Drawdown Duration'] = _round_timedelta(dd_dur_mean)
         s.loc['Avg. Drawdown Duration [D]'] = round(dd_dur_mean.total_seconds() / 86400, 4)
-        s.loc['Drawdown Peak'] = day_dd.idxmax()
+        s.loc['Drawdown Peak'] = day_dd.idxmax() if max_dd != 0 else pd.NaT
         s.loc['# Trades'] = n_trades = len(trades_df)
         win_rate = np.nan if not n_trades else (pl > 0).mean()
         s.loc['Win Rate [%]'] = round(win_rate * 100, 4)
@@ -350,14 +355,22 @@ class Eq(bt.Analyzer):
 
 
 def compute_drawdown_duration_peaks(dd: pd.Series):
+    empty_durations = pd.Series(pd.NaT, index=dd.index, dtype='timedelta64[ns]')
+    empty_peaks = pd.Series(np.nan, index=dd.index, dtype=float)
+    if dd.empty:
+        return empty_durations, empty_peaks
+
     iloc = np.unique(np.r_[(dd == 0).values.nonzero()[0], len(dd) - 1])
     iloc = pd.Series(iloc, index=dd.index[iloc])
     df = iloc.to_frame('iloc').assign(prev=iloc.shift())
-    df = df[df['iloc'] > df['prev'] + 1].astype(int)
+    recovered = df['iloc'] > df['prev'] + 1
+    # Include an unfinished episode even if only the final bar is below its peak.
+    unfinished = (df['iloc'] == len(dd) - 1) & df['prev'].notna() & (dd.iloc[-1] > 0)
+    df = df[recovered | unfinished].astype(int)
 
-    # If no drawdown since no trade, avoid below for pandas sake and return nan series
+    # Keep duration and percentage types distinct when no episodes exist.
     if not len(df):
-        return (dd.replace(0, np.nan),) * 2
+        return empty_durations, empty_peaks
 
     df['duration'] = df['iloc'].map(dd.index.__getitem__) - df['prev'].map(dd.index.__getitem__)
     df['peak_dd'] = df.apply(lambda row: dd.iloc[row['prev']:row['iloc'] + 1].max(), axis=1)
