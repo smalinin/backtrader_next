@@ -907,7 +907,7 @@ class Aurora(with_metaclass(MetaParams, object)):
             return_heatmap, return_optimization, params, on_error)
 
     def plot(self, iplot=False, start=None, end=None,
-             width=1000, height=900, show=True, filename=None, show_eq=False, **kwargs):
+             show=True, filename=None, show_eq=False, **kwargs):
         '''
         Plots the strategies inside Aurora
 
@@ -922,10 +922,6 @@ class Aurora(with_metaclass(MetaParams, object)):
         ``datetime.date``, ``datetime.datetime`` instance indicating the end
         of the plot
 
-        ``width``: in px of the saved figure
-
-        ``height``: in px of the saved figure
-        
         ``show``: whether to display the plot
         
         ``filename``: filename to save the plot (default: auto-generated)
@@ -942,7 +938,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         if 'ipykernel' in sys.modules:
             iplot = True
         plotter.plot(flat_runstrats, iplot=iplot, start=start, end=end,
-                        width=width, height=height, show=show, filename=filename, show_eq=show_eq)
+                     show=show, filename=filename, show_eq=show_eq)
 
     @property
     def statistics(self) -> pd.Series:

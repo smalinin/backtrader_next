@@ -88,6 +88,8 @@ class Eq(bt.Analyzer):
     trades and fills invalidate the corresponding cache, so reading results
     during run() does not freeze the final report. Execution dates use the
     broker's actual fill times, including fills at a previous bar's close.
+    All generated datetime columns and equity timestamps are UTC without
+    tzinfo. Internal equity/order records retain numeric UTC dates.
     '''
 
     params = (
@@ -123,8 +125,8 @@ class Eq(bt.Analyzer):
             self._trade_executions[trade.ref] = tuple(trade._execution_history)
             size = trade.peak_size * (1 if trade.long else -1)
             self.trades.append([trade.ref, trade.data._name, trade.tradeid, trade.commission,
-                                trade.pnl, trade.pnlcomm, trade.return_pct, trade.open_datetime(),
-                                trade.close_datetime(), size, trade.barlen, trade.priceopen,
+                                trade.pnl, trade.pnlcomm, trade.return_pct, bt.num2date(trade.dtopen),
+                                bt.num2date(trade.dtclose), size, trade.barlen, trade.priceopen,
                                 trade.priceclose, trade.entry_notional, trade.return_net_pct])
             self.trades_df = None
 
@@ -148,11 +150,11 @@ class Eq(bt.Analyzer):
         if self.p.cash:
             pvals.append(self._cash)
 
-        # Use raw float datetime key (avoid num2date per bar).
-        # _dt0 is set by AuroraStrategy._oncepost; fall back for non-Aurora.
+        # UTC numeric keys also keep both occurrences of a repeated local
+        # wall-clock time during DST fallback. Never key equity by local time.
         dt_key = getattr(self.strategy, '_dt0', None)
         if dt_key is None:
-            dt_key = self.strategy.datetime.datetime()
+            dt_key = self.strategy.datetime[0]
         self.rets[dt_key] = pvals
         self.eq_df = None
 
@@ -162,7 +164,7 @@ class Eq(bt.Analyzer):
         for fill in order.executed.iterpending():
             if fill is None:
                 break
-            self.orders.append([order.ref, order.data._name, order.data.num2date(fill.dt),
+            self.orders.append([order.ref, order.data._name, fill.dt,
                                 order.ordtype, fill.price, fill.size])
             self.orders_df = None
 
@@ -215,6 +217,9 @@ class Eq(bt.Analyzer):
     def gen_orders(self, data_name=None) -> 'DataFrame':
         if self.orders_df is None:
             self.orders_df = df.from_records(self.orders, columns=self.orders_header)
+            if not self.orders_df.empty:
+                from backtrader_next.utils.arraydates import num2datetime_array
+                self.orders_df['o_datetime'] = num2datetime_array(self.orders_df['o_datetime'].to_numpy())
         if data_name is None:
             return self.orders_df
         else:

@@ -17,7 +17,7 @@ from backtrader_next.strategy import Strategy
 from backtrader_next.analyzers.eq import Eq
 
 from ..utils.py3 import with_metaclass
-from ..utils.date import format_datetime
+from ..utils.arraydates import num2datetime_array
 from ..lineiterator import IndicatorBase
 from .. import AutoInfoClass, MetaParams, Order, date2num, num2date
 from .nscheme import PlotScheme
@@ -25,6 +25,15 @@ from .nscheme import PlotScheme
 from bn_lightweight_charts.widgets import HTMLChart_BN
 
 #TODO add plot observers
+
+
+def _utc_dates(values):
+    """Convert numeric engine clocks to naive UTC datetimes for the renderer."""
+    return pd.DatetimeIndex(num2datetime_array(values)).to_pydatetime()
+
+
+def _format_utc_date(value):
+    return num2date(value).isoformat(sep=' ')
 
 class PInfo(object):
     def __init__(self, sch):
@@ -55,7 +64,7 @@ class Plot(with_metaclass(MetaParams, object)):
         self.chart = None
 
     def plot(self, stratlist, iplot=False,
-             start=None, end=None, width=None, height=None, show_eq=False,
+             start=None, end=None, show_eq=False,
              show=True, filename=None, **kwargs):
         if filename is None:
             return
@@ -70,7 +79,7 @@ class Plot(with_metaclass(MetaParams, object)):
             occurrences[name] += 1
             if names[name] > 1:
                 name += f" #{occurrences[name]}"
-            self.plot_one(strategy, start=start, end=end, width=width, height=height,
+            self.plot_one(strategy, start=start, end=end,
                           show_eq=show_eq, filename=filename, strategy_name=name, **kwargs)
         if self.chart is None:
             return
@@ -78,7 +87,7 @@ class Plot(with_metaclass(MetaParams, object)):
         if iplot or show:
             webbrowser.open(Path(filename).resolve().as_uri())
 
-    def plot_one(self, strategy, start=None, end=None, width=None, height=None,
+    def plot_one(self, strategy, start=None, end=None,
                  show_eq=False, filename=None, strategy_name=None, **kwargs):
         if not strategy.datas or not len(strategy) or filename is None:
             return
@@ -111,10 +120,12 @@ class Plot(with_metaclass(MetaParams, object)):
             self.performance_metrics = self.performance.compute_stats()
             if show_eq:
                 equity = self.performance.gen_eq()['value']
-                mask = [self._time_start <= date2num(date) <= self._time_end for date in equity.index]
+                dates = np.fromiter((date2num(value) if isinstance(value, datetime.date) else value
+                                     for value in self.performance.rets), dtype=float)
+                mask = (dates >= self._time_start) & (dates <= self._time_end)
                 values = (equity / equity.iloc[0] - 1) * 100
                 c_top['eq'] = {'label': 'Equity', 'mode': 'plot',
-                               'data': {'time': equity.index[mask].to_pydatetime(),
+                               'data': {'time': _utc_dates(dates[mask]),
                                         'Equity': values[mask].to_numpy()}}
 
         for data_index, data in enumerate(strategy.datas):
@@ -158,7 +169,7 @@ class Plot(with_metaclass(MetaParams, object)):
             return np.zeros(0, dtype=bool), np.asarray([], dtype=object)
         dates = np.asarray(clock.datetime.plot())[:min(len(clock), size)]
         mask = (dates >= self._time_start) & (dates <= self._time_end)
-        return mask, np.asarray([num2date(value) for value in dates[mask]], dtype=object)
+        return mask, _utc_dates(dates[mask])
 
     def prepare_trades_list(self, data_name:str):
         if self.performance is None:
@@ -180,8 +191,8 @@ class Plot(with_metaclass(MetaParams, object)):
                          'pnl': trade.pnl if closed else '',
                          'pnlcomm': trade.pnlcomm if closed else '',
                          'return_pct': f'{trade.return_net_pct * 100:.3f}' if closed else '',
-                         'dateopen': format_datetime(trade.data.num2date(fills[0].dt)),
-                         'dateclose': format_datetime(trade.data.num2date(fills[-1].dt)) if closed else '--',
+                         'dateopen': _format_utc_date(fills[0].dt),
+                         'dateclose': _format_utc_date(fills[-1].dt) if closed else '--',
                          'size': trade.peak_size * (1 if trade.long else -1),
                          'barlen': trade.barlen if closed else len(trade.data) - trade.baropen,
                          'priceopen': trade.priceopen,
@@ -189,7 +200,7 @@ class Plot(with_metaclass(MetaParams, object)):
             for fill in fills:
                 rows.append({'type': 1, 'o_ref': fill.order_ref if fill.order_ref is not None else '--',
                              'o_size': fill.size,
-                             'o_datetime': format_datetime(trade.data.num2date(fill.dt)),
+                             'o_datetime': _format_utc_date(fill.dt),
                              'o_price': fill.price,
                              'o_ordtype': Order.Buy if fill.size > 0 else Order.Sell})
         return rows
@@ -261,21 +272,24 @@ class Plot(with_metaclass(MetaParams, object)):
             draw_item(target, panel)
             if is_main and self.performance is not None:
                 markers = []
-                for _, row in self.performance.gen_orders(data_name).iterrows():
-                    if not self._time_start <= date2num(row['o_datetime']) <= self._time_end:
+                # Filter original numeric UTC clocks, before datetime rounding
+                # or formatting. A feed's display timezone never affects this.
+                for _, name, dt0, _, price, size in self.performance.orders:
+                    if name != data_name or not self._time_start <= dt0 <= self._time_end:
                         continue
-                    buying = row['o_size'] > 0
+                    buying = size > 0
                     color = 'lightgreen' if buying else 'red'
-                    markers.append(dict(time=row['o_datetime'], position='below',
+                    markers.append(dict(time=num2date(dt0), position='below',
                                         shape='arrow_up' if buying else 'arrow_down', color=color,
-                                        text=f"{'Buy' if buying else 'Short'} @ {row['o_price']}"))
-                    markers.append(dict(time=row['o_datetime'], position='atPriceMiddle',
-                                        shape='circle', color=color, text='', price=row['o_price'], size=0.6))
+                                        text=f"{'Buy' if buying else 'Sell'} @ {price}"))
+                    markers.append(dict(time=num2date(dt0), position='atPriceMiddle',
+                                        shape='circle', color=color, text='', price=price, size=0.6))
                 for _, row in self.performance.gen_trades(data_name).iterrows():
-                    if not self._time_start <= date2num(row['dateclose']) <= self._time_end:
+                    dt0 = self.performance._trade_executions[row['ref']][-1].dt
+                    if not self._time_start <= dt0 <= self._time_end:
                         continue
                     profit = row['pnlcomm'] > 0
-                    markers.append(dict(time=row['dateclose'], position='above', shape='square',
+                    markers.append(dict(time=num2date(dt0), position='above', shape='square',
                                         color='yellow' if profit else 'fuchsia',
                                         text='+Profit+' if profit else '-Loss-'))
                 markers.sort(key=lambda marker: marker['time'])
