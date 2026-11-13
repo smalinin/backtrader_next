@@ -27,7 +27,6 @@ from backtrader_next.utils.datefilters import filter_dataframe_dates
 from backtrader_next import date2num
 import backtrader_next.feed as feed
 
-import numpy as np
 import pandas as pd
 
 
@@ -138,6 +137,8 @@ class PandasData(feed.DataBase):
 
       - ``fromdate`` and ``todate`` are inclusive. A ``datetime`` preserves
         its time of day; a ``date`` includes the corresponding calendar day.
+
+      - Missing optional data fields contain NaN in all execution modes.
     '''
 
     params = (
@@ -326,8 +327,8 @@ class PandasData(feed.DataBase):
 
             colindex = self._colmapping[datafield]
             if colindex is None:
-                # datafield signaled as missing in the stream: create array with nan
-                line.ndbuffer(np.full(df_len, np.nan, dtype=np.double))
+                # Keep missing lines growable, like the populated data fields.
+                line.ndbuffer(array('d', [float('nan')]) * df_len)
             else:
                 # indexing for pandas: 1st is colum, then row
                 ds = self.p.dataframe.iloc[:, colindex]
@@ -345,7 +346,6 @@ class PandasData(feed.DataBase):
 
         # convert to float via datetime and store it
         dt = pd.DatetimeIndex(tstamp).to_pydatetime()
-        #self.lines.datetime.ndbuffer(np.array([date2num(v) for v in dt]))
         self.lines.datetime.ndbuffer(array('d', (date2num(v) for v in dt)))
 
         # Done ... return
