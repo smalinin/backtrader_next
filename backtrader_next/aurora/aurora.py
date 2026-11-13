@@ -67,7 +67,9 @@ class Aurora(with_metaclass(MetaParams, object)):
       
       - ``stdstats`` (default: ``False``) - Add standard observers (Broker, Trades, BuySell)
       
-      - ``stats`` (default: ``True``) - Add Eq analyzer for equity tracking
+      - ``stats`` (default: ``True``) - Create a fresh Eq named ``eq`` per
+        strategy/run unless already registered; keep engine configuration
+        unchanged. Explicit analyzers are retained when stats is False.
       
       - ``lookahead`` (default: ``0``) - Lookahead bars for indicators
       
@@ -295,6 +297,9 @@ class Aurora(with_metaclass(MetaParams, object)):
         Add an Analyzer class to the engine
         
         Analyzers are instantiated and attached to strategies during run()
+
+        Register Eq with its default name or _name='eq' to configure the
+        equity analyzer used by stats=True without adding a second one.
         
         Args:
             ancls: Analyzer class to instantiate
@@ -450,14 +455,6 @@ class Aurora(with_metaclass(MetaParams, object)):
             if key in pkeys:
                 setattr(self.params, key, val)
         
-        # Add Eq analyzer if stats enabled
-        if self.p.stats:
-            try:
-                from .. import analyzers
-                self.addanalyzer(analyzers.Eq, _name='eq')
-            except ImportError:
-                pass  # Eq analyzer not available
-        
         # Ensure we have at least one strategy
         if not self.strats:
             from ..strategy import Strategy
@@ -590,6 +587,11 @@ class Aurora(with_metaclass(MetaParams, object)):
             # Instantiate and attach analyzers
             for ancls, anargs, ankwargs in self.analyzers:
                 strat._addanalyzer(ancls, *anargs, **ankwargs)
+
+            # Keep the automatic analyzer local to this strategy/run.
+            if self.p.stats and 'eq' not in strat.analyzers.getnames():
+                from ..analyzers import Eq
+                strat._addanalyzer(Eq, _name='eq')
             
             # Instantiate and attach observers
             for multi, obscls, obargs, obkwargs in self.observers:

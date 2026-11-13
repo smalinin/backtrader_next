@@ -99,8 +99,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
       - ``stats`` (default: ``True``)
 
-        If True default Observers will be added: Broker (Cash and Value),
-        Trades and BuySell
+        If True each strategy gets a fresh Eq analyzer named ``eq`` unless
+        that name is already registered. Automatic analyzers are created per
+        run without modifying the engine's analyzer configuration. Explicit
+        analyzers are retained when stats is False.
 
       - ``exactbars`` (default: ``False``)
 
@@ -617,6 +619,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         Adds an ``Analyzer`` class to the mix. Instantiation will be done at
         ``run`` time
+
+        Register Eq with its default name or ``_name='eq'`` to configure the
+        equity analyzer used by ``stats=True`` without adding a second one.
         '''
         self.analyzers.append((ancls, args, kwargs))
 
@@ -1335,11 +1340,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
             for data in self.datas:
                 cerebro_run.adddata(data)
             
-            # Add Eq analyzer by default if not present
-            has_eq = any(ancls.__name__ == 'Eq' for ancls, _, _ in self.analyzers)
-            if not has_eq:
-                cerebro_run.addanalyzer(bt.analyzers.Eq, _name='eq')
-            
             # Copy analyzers
             for ancls, anargs, ankwargs in self.analyzers:
                 cerebro_run.addanalyzer(ancls, *anargs, **ankwargs)
@@ -1909,8 +1909,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self.writers_csv = any(map(lambda x: x.p.csv, self.runwriters))
 
         self.runstrats = list()
-        if self.p.stats:
-            self.addanalyzer(analyzers.Eq, _name='eq')
 
         if self.signals:  # allow processing of signals
             signalst, sargs, skwargs = self._signal_strat
@@ -2086,6 +2084,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
                 for ancls, anargs, ankwargs in self.analyzers:
                     strat._addanalyzer(ancls, *anargs, **ankwargs)
+
+                # Keep the automatic analyzer local to this strategy/run.
+                if self.p.stats and 'eq' not in strat.analyzers.getnames():
+                    strat._addanalyzer(analyzers.Eq, _name='eq')
 
                 sizer, sargs, skwargs = self.sizers.get(idx, defaultsizer)
                 if sizer is not None:
