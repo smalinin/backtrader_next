@@ -684,4 +684,29 @@ class Plot(with_metaclass(MetaParams, object)):
             else:
                 self.dplots_over[key].append(x)
 
+        # Sort Aurora simple indicators (PlottableWrapper instances)
+        for x in getattr(strategy, '_simple_indicators', []):
+            if not x.plotinfo._get('plot', True):
+                continue
+
+            x._plotinit()
+
+            # Determine which data feed this indicator belongs to
+            key = x._data_feed
+            if key is None or key not in strategy.datas:
+                # Fall back to primary data
+                key = strategy.data
+
+            xpmaster = x.plotinfo._get('plotmaster', None)
+            subplot = x.plotinfo._get('subplot', False)
+            plotabove = x.plotinfo._get('plotabove', False)
+
+            if subplot and xpmaster is None:
+                if plotabove:
+                    self.dplots_up[key].append(x)
+                else:
+                    self.dplots_down[key].append(x)
+            else:
+                self.dplots_over[key].append(x)
+
 

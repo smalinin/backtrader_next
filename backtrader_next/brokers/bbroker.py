@@ -1241,8 +1241,7 @@ class BackBroker(bt.BrokerBase):
         if self.p.checksubmit and self.submitted:
             self.check_submitted()
 
-        # Combined credit interest + futures cash adjustment in single pass
-        # (single getcommissioninfo() call per open position instead of 2)
+        # Charge interest on positions held before this bar's executions.
         credit = 0.0
         for data in self._open_data:
             pos = self.positions.get(data)
@@ -1257,13 +1256,6 @@ class BackBroker(bt.BrokerBase):
                     self.d_credit[data] += dcredit
                     credit += dcredit
                     pos.datetime = dt0
-                # Futures cash adjustment: inline for common fast path (non-stocklike, fixed margin)
-                close = data.close[0]
-                if comminfo._fast_value_path:
-                    self.cash += pos.size * (close - pos.adjbase) * comminfo._vp_mult
-                else:
-                    self.cash += comminfo.cashadjust(pos.size, pos.adjbase, close)
-                pos.adjbase = close
 
         self.cash -= credit
 
@@ -1295,6 +1287,18 @@ class BackBroker(bt.BrokerBase):
                     elif order.status == Order.Completed:
                         # a bracket parent order may have been executed
                         self._bracketize(order)
+
+        # Mark remaining positions to close after executions. New and increased
+        # positions use the execution price recorded in adjbase by _execute().
+        for data in self._open_data:
+            pos = self.positions[data]
+            comminfo = self.getcommissioninfo(data)
+            close = data.close[0]
+            if comminfo._fast_value_path:
+                self.cash += pos.size * (close - pos.adjbase) * comminfo._vp_mult
+            else:
+                self.cash += comminfo.cashadjust(pos.size, pos.adjbase, close)
+            pos.adjbase = close
 
         # Update portfolio value — inline fast-path to avoid function call overhead
         if self._open_data:

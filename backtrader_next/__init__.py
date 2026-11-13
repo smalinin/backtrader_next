@@ -83,6 +83,7 @@ from . import sizers as sizers
 from . import stores as stores
 from . import brokers as brokers
 from . import timer as timer
+from . import aurora as aurora
 
 from . import talib as talib
 
