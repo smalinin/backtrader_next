@@ -10,8 +10,8 @@ from ._lifecycle import CleanupOnExit
 class AuroraStrategy(Strategy):
     """Use Strategy's trading and lifecycle APIs with Aurora feeds/indicators.
 
-    Native indicators follow preloaded feed cursors and need explicit value
-    checks. Standard runonce graphs accept feeds/lines and use per-feed warmup.
+    Standard runonce graphs accept feeds/lines and use per-feed warmup.
+    Construct bt.ind/bt.nind indicators in __init__ before graph preparation.
     StandardData supplies explicit column expressions and delayed inputs.
     See docs/aurora/README.md for strategy and order examples.
     """

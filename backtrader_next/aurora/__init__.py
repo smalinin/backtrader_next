@@ -20,11 +20,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-"""Aurora backtesting with NumPy feeds and native or standard indicators.
+"""Aurora backtesting with NumPy feeds and standard indicators.
 
 Use AuroraStrategy and AuroraPandasData/AuroraCSVData. Standard runonce
 indicators accept feeds and feed-backed lines; StandardData provides explicit
-line expressions. Native indicators use aurora.indicators. Live trading,
+line expressions. Use bt.ind or bt.nind for indicators. Live trading,
 runnext, resampling, replay and feed filters remain unsupported.
 See docs/aurora/README.md.
 """
@@ -38,14 +38,11 @@ from .feed import AuroraDataBase
 from ._standard import StandardData
 from .feeds import AuroraPandasData, AuroraCSVData
 from .aurora import Aurora, quickstart
-from .indicators import SMA, EMA, RSI, MACD, BollingerBands, ATR
 from .strategy import AuroraStrategy
-from . import indicators
 
 __all__ = [
     '__version__', '__author__',
     'AuroraLineBufferView', 'AuroraLines', 'AuroraLinesSingle',
     'AuroraDataBase', 'AuroraPandasData', 'AuroraCSVData', 'StandardData',
     'Aurora', 'quickstart', 'AuroraStrategy',
-    'SMA', 'EMA', 'RSI', 'MACD', 'BollingerBands', 'ATR', 'indicators',
 ]

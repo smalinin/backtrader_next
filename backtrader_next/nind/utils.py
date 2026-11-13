@@ -48,7 +48,7 @@ def compute_sma_numba(closes: np.ndarray, period: int):
 
 
 @numba.njit(cache=True)
-def compute_rsi_numba(closes, period, safelow=100.0, safehigh=100.0):
+def compute_rsi_numba(closes, period, safelow=50.0, safehigh=100.0):
     """Wilder RSI; the caller selects the flat and rising zero-loss values."""
     if period < 1:
         raise ValueError('RSI period must be positive')
@@ -81,8 +81,8 @@ def compute_rsi_numba(closes, period, safelow=100.0, safehigh=100.0):
 
 
 @numba.njit(cache=True)
-def compute_atr_numba(high, low, close, period, include_first=True):
-    """Wilder ATR, with explicit selection of the initial true-range sample."""
+def compute_atr_numba(high, low, close, period):
+    """Wilder ATR seeded from period ranges with a previous close."""
     if period < 1:
         raise ValueError('ATR period must be positive')
     n = len(close)
@@ -90,14 +90,13 @@ def compute_atr_numba(high, low, close, period, include_first=True):
     start = 0
     while start < n and np.isnan(close[start]):
         start += 1
-    first = start if include_first else start + 1
+    first = start + 1
     if n - first < period:
         return result
     total = 0.0
     for i in range(first, n):
         true_range = high[i] - low[i]
-        if i > start:
-            true_range = max(true_range, abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
+        true_range = max(true_range, abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
         if i < first + period:
             total += true_range
             if i == first + period - 1:

@@ -37,5 +37,5 @@ class ATR(bt.Indicator):
     def once(self, start, end):
         high, low, close = (np.asarray(line.array) for line in
                             (self.data.high, self.data.low, self.data.close))
-        values = compute_atr_numba(high, low, close, self.p.period, include_first=False)
+        values = compute_atr_numba(high, low, close, self.p.period)
         np.copyto(np.asarray(self.lines.atr.array), values)

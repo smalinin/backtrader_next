@@ -20,6 +20,7 @@ from backtrader_next.utils.dateintern import format_datetime
 
 from ..utils.py3 import with_metaclass
 from ..utils.date import format_datetime
+from ..dataseries import DataSeries
 from .. import AutoInfoClass, MetaParams, TimeFrame, date2num, num2date
 from .nscheme import PlotScheme
 
@@ -658,6 +659,10 @@ class Plot(with_metaclass(MetaParams, object)):
 
             # support LineSeriesStub which has "owner" to point to the data
             key = getattr(x._clock, 'owner', x._clock)
+            # StandardData is an input facade over a strategy's Aurora feed.
+            # Keep indicator parents intact so chained overlays stay attached.
+            if isinstance(key, DataSeries) and all(key is not data for data in strategy.datas):
+                key = getattr(key, '_clock', key)
             if key is strategy:  # a LinesCoupler
                 key = strategy.data
 
@@ -683,30 +688,3 @@ class Plot(with_metaclass(MetaParams, object)):
                     self.dplots_down[key].append(x)
             else:
                 self.dplots_over[key].append(x)
-
-        # Sort Aurora simple indicators (PlottableWrapper instances)
-        for x in getattr(strategy, '_simple_indicators', []):
-            if not x.plotinfo._get('plot', True):
-                continue
-
-            x._plotinit()
-
-            # Determine which data feed this indicator belongs to
-            key = x._data_feed
-            if key is None or key not in strategy.datas:
-                # Fall back to primary data
-                key = strategy.data
-
-            xpmaster = x.plotinfo._get('plotmaster', None)
-            subplot = x.plotinfo._get('subplot', False)
-            plotabove = x.plotinfo._get('plotabove', False)
-
-            if subplot and xpmaster is None:
-                if plotabove:
-                    self.dplots_up[key].append(x)
-                else:
-                    self.dplots_down[key].append(x)
-            else:
-                self.dplots_over[key].append(x)
-
-

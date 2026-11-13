@@ -601,8 +601,7 @@ class Aurora(with_metaclass(MetaParams, object)):
     
     def _runonce(self, runstrats):
         """Prepare indicator graphs and execute synchronized preloaded bars."""
-        # Use the standard dependency calculation for registered graphs. Native
-        # indicators are separate and need no standard buffer allocation.
+        # Prepare every registered graph through the standard dependency lifecycle.
         for strat in runstrats:
             if strat._ind_iterator or strat._obs_iterator:
                 strat._once()
@@ -616,8 +615,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         for data in self.datas:
             data.home()
 
-        # Preserve the native path's feed-home-before-strategy-reset ordering.
-        # Only strategy buffers are cleared; calculated indicator arrays stay.
+        # Home feeds before resetting strategy buffers; keep calculated outputs.
         for strat in runstrats:
             strat.reset()
         
