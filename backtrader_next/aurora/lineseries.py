@@ -124,7 +124,7 @@ class AuroraLines:
     _linenames = ('datetime', 'open', 'high', 'low', 'close', 'volume', 
                   'openinterest')
     
-    def __init__(self, linenames=None, initdata=None):
+    def __init__(self, linenames=None, initdata=None, *, copy=True):
         """
         Initialize AuroraLines container.
         
@@ -133,6 +133,8 @@ class AuroraLines:
                                         Defaults to OHLCV names.
             initdata (np.ndarray, optional): Initial 2D data array.
                                             Shape: (n_bars, n_lines)
+            copy (bool): Copy a 2D NumPy input by default. Set False to reuse
+                         an existing matrix, as preloaded data feeds do.
         """
         if linenames is not None:
             self._linenames = linenames
@@ -146,7 +148,7 @@ class AuroraLines:
                     # Single line, reshape to 2D
                     self.data = initdata.reshape(-1, 1)
                 else:
-                    self.data = initdata.copy()
+                    self.data = initdata.copy() if copy else initdata
             else:
                 # Convert to numpy array
                 self.data = np.array(initdata, dtype=np.float64)

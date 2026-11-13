@@ -347,10 +347,11 @@ class AuroraDataBase:
         if self.data is None:
             raise RuntimeError("Data must be loaded before initializing lines")
         
-        # Create lines container with reference to our data and index
+        # The feed owns the loaded matrix; all line views reuse that storage.
         self.lines = AuroraLines(
             linenames=self._linenames,
-            initdata=self.data
+            initdata=self.data,
+            copy=False,
         )
         
         # Share the same _idx reference
