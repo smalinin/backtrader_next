@@ -8,6 +8,73 @@
 from bisect import bisect_right
 
 
+def _indicator_graph(owner):
+    """Collect registered indicators, including nested dependency trees."""
+    nodes = {}
+
+    def collect(parent):
+        for indicator in getattr(parent, '_ind_iterator', ()):
+            if id(indicator) not in nodes:
+                nodes[id(indicator)] = indicator
+                collect(indicator)
+
+    collect(owner)
+    return nodes
+
+
+def home_indicators(owner):
+    """Reset output cursors without clearing their calculated arrays."""
+    for indicator in _indicator_graph(owner).values():
+        indicator.home()
+
+
+def advance_indicators(owner, clocks=None):
+    """Align calculated outputs to their clocks, optionally for activated data.
+
+    Clock dependencies are visited before their consumers. Output arrays are
+    fixed after preparation; neither an idle feed nor repeated synchronization
+    may consume another output value. A strategy clock can outlive its first
+    feed, so output navigation is also bounded by the calculated buffer length.
+    """
+    nodes = _indicator_graph(owner)
+    visited = {}
+
+    def advance(indicator):
+        key = id(indicator)
+        if key in visited:
+            return visited[key]
+        visited[key] = False
+
+        clock = indicator._clock
+        # A clock may be an indicator itself, or a line/stub owned by one.
+        dependency = nodes.get(id(clock))
+        if dependency is None:
+            # LineSeriesStub can wrap a LineActions object whose owner is the
+            # strategy. The wrapped line itself is then the clock dependency.
+            dependency = nodes.get(id(clock.lines[0]))
+        if dependency is None:
+            dependency = nodes.get(id(getattr(clock, '_owner', None)))
+        if dependency is not None:
+            affected = advance(dependency)
+        else:
+            # Facades and their individual input lines share a raw feed cursor.
+            shared = getattr(clock, '_once_cursor', None)
+            clock_owner = getattr(clock, '_owner', None)
+            affected = (clocks is None or id(clock) in clocks or
+                        id(clock_owner) in clocks or id(shared) in clocks or
+                        id(getattr(clock_owner, '_once_cursor', None)) in clocks)
+
+        if affected:
+            size = min(len(clock), indicator.buflen()) - len(indicator)
+            if size > 0:
+                indicator.advance(size=size)
+        visited[key] = affected
+        return affected
+
+    for indicator in nodes.values():
+        advance(indicator)
+
+
 def synchronize_activated_data(data):
     environment = getattr(data, '_env', None)
     synchronizer = getattr(environment, '_data_sync', None)
@@ -48,18 +115,4 @@ class DataSynchronizer:
         clocks = {id(data)}
         clocks.update(id(line) for line in data.lines)
         for strategy in self.strategies:
-            self._synchronize_indicators(strategy, clocks)
-
-    def _synchronize_indicators(self, owner, clocks):
-        for indicator in getattr(owner, '_ind_iterator', ()):
-            self._synchronize_indicators(indicator, clocks)
-            clock = indicator._clock
-            if id(clock) not in clocks and not any(
-                    id(line) in clocks for line in clock.lines):
-                continue
-
-            size = len(clock) - len(indicator)
-            if size > 0:
-                indicator.advance(size=size)
-            clocks.add(id(indicator))
-            clocks.update(id(line) for line in indicator.lines)
+            advance_indicators(strategy, clocks)

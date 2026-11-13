@@ -3,6 +3,7 @@
 """Strategy execution for Aurora's preloaded backtesting engine."""
 
 from backtrader_next.strategy import Strategy
+from backtrader_next.utils.datasync import advance_indicators
 from ._lifecycle import CleanupOnExit
 
 
@@ -36,6 +37,9 @@ class AuroraStrategy(Strategy):
         # Cache raw float datetime so analyzers (eq.py) can use it
         # without calling num2date on every bar
         self._dt0 = dt0
+
+        if self._ind_iterator:
+            advance_indicators(self)
         
         # Process notifications (orders, trades)
         self._notify()

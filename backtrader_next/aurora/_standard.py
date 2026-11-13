@@ -1,7 +1,8 @@
 """Standard line interfaces over Aurora input storage.
 
-Aurora calculates standard dependency graphs after preloading. Per-bar output
-advancement and the public input adapters are separate integration steps.
+Aurora calculates standard dependency graphs after preloading and advances
+their output cursors by clock. Automatic public input adaptation and full
+strategy/analyzer warmup dispatch remain separate integration steps.
 """
 
 from backtrader_next.dataseries import OHLCDateTime
