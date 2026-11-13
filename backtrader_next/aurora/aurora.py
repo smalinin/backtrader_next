@@ -125,9 +125,6 @@ class Aurora(with_metaclass(MetaParams, object)):
         self.observers = list()
         self.sizers = dict()  # {idx or None: (sizercls, args, kwargs)}
         
-        # Statistics
-        self._statistics = None
-        
         # Flags (always in runonce/preload mode)
         self._dopreload = True
         self._dorunonce = True
@@ -433,19 +430,6 @@ class Aurora(with_metaclass(MetaParams, object)):
         '''
         self.setbroker(value)
     
-    @property
-    def statistics(self):
-        '''
-        Get backtesting statistics as pandas Series
-        
-        Returns:
-            pd.Series: Statistics from Eq analyzer (equity, drawdown, etc.)
-            
-        Note:
-            Available only after run() has completed
-        '''
-        return self._statistics
-    
     def run(self, **kwargs):
         '''
         Execute backtesting
@@ -478,6 +462,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         for key, val in kwargs.items():
             setattr(self.params, key, val)
 
+        self.runstrats = list()
         if not self.datas:
             return []
         
@@ -488,7 +473,6 @@ class Aurora(with_metaclass(MetaParams, object)):
         
         # Execute strategies (with optimization support)
         iterstrats = itertools.product(*self.strats)
-        self.runstrats = list()
         
         # The parent owns preloaded feeds and the progress bar during native
         # multiprocessing optimization. Workers manage their own run resources.
@@ -530,16 +514,6 @@ class Aurora(with_metaclass(MetaParams, object)):
                         pool.join()
         finally:
             self._run_cleanup_complete = True
-        
-        # Extract statistics from Eq analyzer (only for single run)
-        if self.p.stats and self.runstrats and not self._dooptimize:
-            try:
-                eq_analyzer = self.runstrats[0][0].analyzers.getbyname('eq')
-                if eq_analyzer:
-                    analysis = eq_analyzer.get_analysis()
-                    self._statistics = pd.Series(analysis) if isinstance(analysis, dict) else None
-            except (AttributeError, IndexError):
-                pass
         
         # Return results: list of strategies for optimization, single strategy list otherwise
         if not self._dooptimize:
@@ -1107,14 +1081,14 @@ class Aurora(with_metaclass(MetaParams, object)):
     @property
     def statistics(self) -> pd.Series:
         '''
-        Get strategy statistics
-        
-        Returns:
-            pd.Series: Strategy performance statistics
+        Return strategy statistics, or an empty Series before any bars run.
+
+        Multiple strategies retain the existing behavior: use the first
+        strategy's Eq statistics and the "Multiple Strategies" description.
         '''
         flat_runstrats = [strat for stratlist in self.runstrats for strat in stratlist]
-        if len(flat_runstrats) == 0:
-            return pd.DataFrame.empty()
+        if not flat_runstrats or not any(len(strat) for strat in flat_runstrats):
+            return pd.Series(dtype=object)
         if len(flat_runstrats) > 1:
             desc = pd.Series(dtype=object)
             desc.loc["Strategy"] = "Multiple Strategies"

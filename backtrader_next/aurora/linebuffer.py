@@ -464,28 +464,6 @@ class AuroraLineBufferView:
             return np.array([], dtype=np.float64)
         return self.parent_array[:cur_len, self.column_idx].copy()
     
-    def plot(self):
-        """
-        Get column data for plotting (all values up to current position).
-        
-        Required by nplot for chart generation.
-        Returns the same as get_array() for Aurora - all values up to current idx.
-        """
-        return self.get_array()
-    
-    def plotrange(self, start, end):
-        """
-        Get plot data for specific range.
-        
-        Args:
-            start (int): Start index
-            end (int): End index
-        
-        Returns:
-            np.ndarray: Data slice for plotting
-        """
-        return self.parent_array[start:end, self.column_idx].copy()
-    
     def addbinding(self, binding):
         """Add binding to another buffer."""
         self.bindings.append(binding)
@@ -551,7 +529,7 @@ class AuroraLineBufferView:
     
     def plot(self, idx=0, size=None):
         """
-        Get data for plotting (from idx to current position).
+        Get a view of preloaded data from an absolute index.
         
         Args:
             idx (int): Start index (default: 0)
@@ -567,7 +545,8 @@ class AuroraLineBufferView:
     
     def plotrange(self, start, end):
         """
-        Get data slice for specific range.        
+        Get a view of preloaded data for the absolute range [start, end).
+
         Args:
             start (int): Start index
             end (int): End index

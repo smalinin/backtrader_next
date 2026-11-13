@@ -232,24 +232,6 @@ class AuroraDataBase:
             self.start()
             self._started = True
     
-    def start(self):
-        """
-        User-overridable start method.
-        
-        Called once at the beginning of backtesting. Can be overridden
-        by subclasses to perform custom initialization.
-        """
-        pass
-    
-    def stop(self):
-        """
-        Clean up resources (called by Cerebro/Aurora after run).
-        
-        Called once at the end of backtesting. Can be overridden
-        by subclasses to perform cleanup.
-        """
-        pass
-    
     def reset(self):
         """
         Reset the data feed to initial state.
@@ -425,29 +407,6 @@ class AuroraDataBase:
                 self.lines._idx = self._idx
             return True
         return False
-    
-    def advance_peek(self):
-        """
-        Peek at the datetime of the next bar without advancing.
-        
-        Used by Aurora._runonce to determine the next datetime across
-        multiple data feeds for chronological synchronization.
-        
-        Returns:
-            float: Datetime (as num) of the next bar, or float('inf') if no more data
-        
-        Example:
-            >>> dt = data.advance_peek()
-            >>> if dt < float('inf'):
-            ...     data.advance()  # Actually move to that bar
-        """
-        next_idx = self._idx + 1
-        
-        if next_idx < self._length:
-            # Return datetime of next bar (column 0)
-            return self.data[next_idx, 0]
-        
-        return float('inf')  # No more data available
     
     def home(self):
         """
