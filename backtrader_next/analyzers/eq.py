@@ -47,6 +47,10 @@ class Eq(bt.Analyzer):
         - Trade statistics: Win Rate, Best/Worst/Avg Trade, # of Trades
         - Performance ratios: Calmar Ratio, VWR Ratio, Profit Factor, Profit Factor [eq], SQN, Kelly Criterion
 
+        CAGR uses elapsed calendar time on a fixed 365-day year basis,
+        independently of the observation frequency or trading calendar.
+        Daily-return statistics use their separate annualization factor.
+
         Without daily drawdowns, drawdown magnitude and duration are zero,
         and Drawdown Peak is NaT. Ratios requiring a nonzero drawdown remain NaN.
 
@@ -212,7 +216,6 @@ class Eq(bt.Analyzer):
         gmean_day_return = geometric_mean(day_returns)
         annual_trading_days = float(365 if index.dayofweek.to_series().between(5, 6).mean() > 2 / 7 * .6
                                         else 252)
-        num_years = (eq_df.index[-1] - eq_df.index[0]).total_seconds() / 86400 / annual_trading_days
 
         day_dd = (1 - day_eq / day_eq.cummax()) * 100
         dd_dur, dd_peaks = compute_drawdown_duration_peaks(day_dd)
@@ -253,7 +256,9 @@ class Eq(bt.Analyzer):
         volatility = day_returns.std(ddof=1) * np.sqrt(annual_trading_days) * 100
         s.loc['Volatility (Ann.) [%]'] = round(volatility, 4)
 
-        # CAGR
+        # CAGR uses elapsed calendar time on a fixed 365-day year basis.
+        elapsed_days = (index[-1] - index[0]).total_seconds() / 86400
+        num_years = elapsed_days / 365.0
         equity_ratio = equity[-1] / equity[0] if equity[0] != 0 else np.nan
         if num_years > 0:
             if equity_ratio == 0:
