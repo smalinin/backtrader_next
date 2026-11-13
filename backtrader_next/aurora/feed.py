@@ -50,11 +50,15 @@ Benefits:
 
 API Compatibility:
 -----------------
-Maintains full compatibility with backtrader DataBase API:
+Exposes selected backtrader-style DataBase methods:
 - data.datetime[0], data.close[0], etc.
 - len(data), data.buflen()
 - advance(), home(), forward(), rewind()
 - Indexing: data[0] (current), data[-1] (previous)
+
+The shared NumPy index and line views differ from Cerebro's data buffers.
+This interface subset does not provide standard-indicator compatibility;
+use indicators from backtrader_next.aurora.indicators.
 
 Usage:
 ------

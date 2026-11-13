@@ -48,9 +48,10 @@ This provides:
 
 API Compatibility:
 -----------------
-Maintains compatibility with backtrader Lines API:
+Exposes selected backtrader-style Lines methods:
 - lines.datetime, lines.open, lines.close, etc.
-- Indexing: lines[0] = current, lines[1] = previous
+- lines[i] selects a line by its column index
+- Historical indexing: lines.close[0] = current, lines.close[-1] = previous
 - Methods: forward(), home(), advance(), etc.
 """
 

@@ -45,13 +45,19 @@ class Aurora(with_metaclass(MetaParams, object)):
     - Works ONLY in runonce mode (vectorized execution)
     - Supports ONLY backtesting (no live trading)
     - Uses optimized AuroraDataFeed with unified index
-    - Compatible with Cerebro API for strategy migration
+    - Selected Cerebro-style setup and trading APIs for adapted strategies
     
     **Limitations:**
     - No live trading support
     - No replay/resample modes
     - No runnext mode (always runonce)
     - Simplified timer API
+    - Standard bt.ind.* and bt.nind.* indicators are not supported
+    - Use AuroraStrategy, Aurora feeds, and aurora.indicators.*
+
+    Existing Cerebro strategies require adaptation. Similar method names do
+    not imply support for Cerebro's complete indicator or execution lifecycle.
+    See README.md in this package for migration guidance.
     
     **Params:**
     
@@ -159,7 +165,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         Add a Data Feed instance to Aurora
         
         Args:
-            data: AuroraDataBase instance or compatible data feed
+            data: AuroraDataBase instance, such as AuroraPandasData or AuroraCSVData
             name: Optional name for the data feed (for reference/plotting)
             
         Returns:
@@ -187,7 +193,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         Add a Strategy class for execution
         
         Args:
-            strategy: Strategy class (not instance) to be executed
+            strategy: AuroraStrategy subclass (not instance) using Aurora indicators
             *args: Positional arguments passed to strategy __init__
             **kwargs: Keyword arguments passed to strategy __init__
             

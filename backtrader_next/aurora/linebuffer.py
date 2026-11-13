@@ -34,8 +34,9 @@ Key improvements:
 - Faster slicing and access operations
 
 Compatibility:
-- API compatible with backtrader_next.LineBuffer
+- Exposes selected methods from backtrader_next.LineBuffer
 - Supports same indexing: [0] = current, [-1] = previous, [1] = future
+- Standard Cerebro indicators are not supported by this interface subset
 """
 
 from __future__ import (absolute_import, division, print_function,
@@ -54,8 +55,8 @@ class AuroraLineBuffer:
     Optimized line buffer using NumPy arrays.
     
     Index 0 points to the current active element for input/output.
-    Positive indices fetch values from the past (e.g., [1] = previous bar).
-    Negative indices fetch values from the future (if preloaded).
+    Negative indices fetch values from the past (e.g., [-1] = previous bar).
+    Positive indices fetch values from the future (if preloaded).
     
     This implementation uses NumPy for:
     - Faster array operations
@@ -131,7 +132,7 @@ class AuroraLineBuffer:
         
         Args:
             ago (int): Offset from current position
-                       0 = current, 1 = previous, -1 = next (future)
+                       0 = current, -1 = previous, 1 = next (future)
         
         Returns:
             float: Value at the specified position

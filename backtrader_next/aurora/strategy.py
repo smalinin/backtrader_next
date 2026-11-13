@@ -3,9 +3,10 @@
 """
 AuroraStrategy - Base strategy class for Aurora backtesting engine
 
-Provides a simplified, Aurora-optimized strategy base class that maintains
-API compatibility with backtrader.Strategy while offering better performance
-for Aurora's vectorized execution model.
+Provides a strategy base class for Aurora's vectorized execution model, with
+familiar trading methods from backtrader_next.Strategy. Strategies must use
+Aurora data feeds and indicators from backtrader_next.aurora.indicators;
+standard bt.ind.* and bt.nind.* indicators are not supported.
 """
 
 import backtrader_next as bt
@@ -16,12 +17,12 @@ class AuroraStrategy(Strategy):
     """
     Base strategy class optimized for Aurora backtesting engine.
     
-    This class extends backtrader.Strategy with Aurora-specific optimizations
-    while maintaining full API compatibility. It's designed to work seamlessly
-    with Aurora's vectorized data feeds and runonce execution mode.
+    This class extends backtrader_next.Strategy with Aurora-specific execution.
+    It retains trading methods such as buy(), sell(), close(), and cancel(),
+    and runs with Aurora's vectorized data feeds and indicator implementations.
     
     Key Features:
-    - Full API compatibility with backtrader.Strategy
+    - Familiar order and position APIs from backtrader_next.Strategy
     - Optimized for Aurora's unified array architecture
     - Simplified lifecycle management for runonce mode
     - Direct access to Aurora broker and data feeds
@@ -71,10 +72,13 @@ class AuroraStrategy(Strategy):
         ```
     
     Notes:
-    - When using Aurora simplified indicators, create them in start() not __init__()
+    - Use backtrader_next.aurora.indicators, not bt.ind.* or bt.nind.*
+    - Existing Cerebro strategies require adaptation; indicator lifecycle
+      compatibility is not provided by inheriting from Strategy
+    - The examples create Aurora simplified indicators in start()
     - Always check if indicator exists before accessing: if self.indicator:
     - Aurora runs only in runonce mode - next() is called for each bar
-    - All trading operations use the same API as backtrader.Strategy
+    - Check indicator values after warmup before making trading decisions
     """
 
     # Class-level defaults ensure these are always found via normal attribute
@@ -104,9 +108,8 @@ class AuroraStrategy(Strategy):
         """
         Initialize the strategy.
         
-        Note: When using Aurora simplified indicators, do NOT create them here.
-        Instead, create them in start() method to avoid timing issues with
-        data feed initialization.
+        See start() for an example using Aurora simplified indicators.
+        Inheriting this class does not enable standard Cerebro indicators.
         """
         # Initialize Aurora-specific attributes BEFORE parent init
         self._aurora_analyzers = None

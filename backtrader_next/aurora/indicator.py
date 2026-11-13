@@ -6,18 +6,23 @@
 #
 ###############################################################################
 """
-AuroraIndicator - базовый класс индикаторов для Aurora.
+AuroraIndicator - low-level indicator base class.
 
-Особенности:
-- Совместимость с API стандартного Indicator
-- Оптимизированный метод once() для работы с Aurora Lines
-- Поддержка numpy векторизованных операций
-- Упрощенная логика без поддержки разных timeframes
+Features:
+- Uses individual IndicatorBase interfaces
+- Optimized once() method for Aurora Lines
+- Supports NumPy vectorized operations
+- Simplified logic without support for different timeframes
 
-Основное отличие от стандартного Indicator:
-- once() работает напрямую с numpy массивами Aurora Lines
-- Не требует advance() для каждого бара
-- Оптимизирован под runonce режим
+Implementation differences from the standard Indicator:
+- once() works directly with NumPy arrays in Aurora Lines
+- Optimized for runonce mode
+
+Inheriting from IndicatorBase does not automatically support standard
+bt.ind.* and bt.nind.* indicators in the Aurora engine. The supported set of
+indicators is exported from backtrader_next.aurora.indicators and uses
+AuroraSimpleIndicator / MultiLineIndicator with a shared feed index.
+This class is not an adapter for standard Cerebro indicators.
 """
 
 import numpy as np
@@ -27,10 +32,10 @@ from backtrader_next.utils.py3 import with_metaclass
 
 class MetaAuroraIndicator(IndicatorBase.__class__):
     """
-    Метакласс для Aurora индикаторов.
+    Metaclass for Aurora indicators.
     
-    Упрощенная версия MetaIndicator без кеширования и с фокусом
-    на runonce режим.
+    Simplified version of MetaIndicator without caching, focused on
+    runonce mode.
     """
     
     _refname = '_indcol'
@@ -38,17 +43,17 @@ class MetaAuroraIndicator(IndicatorBase.__class__):
     
     def __init__(cls, name, bases, dct):
         """
-        Регистрация индикатора и проверка методов.
+        Register the indicator and check its methods.
         """
         super(MetaAuroraIndicator, cls).__init__(name, bases, dct)
         
-        # Регистрация индикатора по имени
+        # Register the indicator by name
         if not cls.aliased and name != 'AuroraIndicator' and not name.startswith('_'):
             refattr = getattr(cls, cls._refname)
             refattr[name] = cls
         
-        # Aurora работает только в режиме runonce
-        # Если once() не переопределен, используем once_via_next
+        # Aurora only runs in runonce mode
+        # If once() is not overridden, use once_via_next
         next_over = cls.next != IndicatorBase.next
         once_over = cls.once != IndicatorBase.once
         
@@ -60,31 +65,20 @@ class MetaAuroraIndicator(IndicatorBase.__class__):
 
 class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
     """
-    Базовый класс индикаторов для Aurora.
+    Low-level base class with individual IndicatorBase interfaces.
     
-    Наследуется от IndicatorBase для совместимости с backtrader API,
-    но оптимизирован для работы с Aurora архитектурой.
+    Inheriting from IndicatorBase does not connect the standard Cerebro
+    indicator lifecycle to Aurora. For Aurora strategies, use the classes
+    exported from backtrader_next.aurora.indicators; this base class is not
+    an adapter for bt.ind.* or bt.nind.*.
     
-    Ключевые методы:
-    - once(start, end): Векторизованный расчет индикатора на диапазоне баров
-    - next(): Расчет индикатора для текущего бара (fallback)
+    Key methods:
+    - once(start, end): Vectorized indicator calculation over a range of bars
+    - next(): Indicator calculation for the current bar (fallback)
     
-    Пример использования:
-        class MySMA(AuroraIndicator):
-            lines = ('sma',)
-            params = (('period', 20),)
-            
-            def __init__(self):
-                self.addminperiod(self.p.period)
-            
-            def once(self, start, end):
-                # Векторизованный расчет через numpy
-                src = self.data.close.array
-                dst = self.lines.sma.array
-                
-                period = self.p.period
-                for i in range(start, end):
-                    dst[i] = np.mean(src[i-period+1:i+1])
+    For custom indicators in Aurora, use AuroraSimpleIndicator or
+    MultiLineIndicator. A strategy example is provided in this package's
+    README.md.
     """
     
     _ltype = LineIterator.IndType
@@ -92,142 +86,141 @@ class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
     
     def __init__(self):
         """
-        Инициализация индикатора.
+        Initialize the indicator.
         
-        Вызывается автоматически после создания объекта.
-        Используется для настройки параметров и зависимостей.
+        Called automatically after the object is created.
+        Used to configure parameters and dependencies.
         """
         super(AuroraIndicator, self).__init__()
     
     def _once(self):
         """
-        Обертка для вызова once() - переопределяет стандартное поведение.
+        Wrapper for calling once() that overrides the standard behavior.
         
-        В стандартном Indicator _once() работает с LineBuffer.once(),
-        но для Aurora нам нужно вызывать наш кастомный once(start, end).
+        In the standard Indicator, _once() works with LineBuffer.once(),
+        but Aurora needs to call its custom once(start, end).
         """
         # DEBUG
         print(f"DEBUG: AuroraIndicator._once() called for {self.__class__.__name__}")
         
-        # Получаем размер данных
+        # Get the data length
         data_len = len(self._clock)
         if data_len <= 0:
             return
         
-        # Сначала вызываем _once() для зависимых индикаторов
+        # First call _once() for dependent indicators
         for indicator in self._ind_iterator:
             indicator._once()
         
-        # Устанавливаем размер наших линий
+        # Set the size of the lines
         self.lines.home()
         self.lines.extend(size=data_len)
         
-        # Вызываем our once() для расчета
+        # Call once() to calculate values
         self.preonce(0, self._minperiod - 1)
         self.oncestart(self._minperiod - 1, self._minperiod)
         self.once(self._minperiod, data_len)
         
-        # Сбрасываем индекс
+        # Reset the index
         self.home()
     
     def advance(self, size=1):
         """
-        Продвижение индекса индикатора.
+        Advance the indicator index.
         
-        Для Aurora индикаторов это упрощено, так как все lines
-        используют единый индекс.
+        This is simplified for Aurora indicators because all lines
+        share a single index.
         
         Args:
-            size (int): Количество баров для продвижения
+            size (int): Number of bars to advance
         """
-        # Проверка синхронизации с clock
+        # Check synchronization with the clock
         if len(self) < len(self._clock):
             self.lines.advance(size=size)
     
     def once(self, start, end):
         """
-        Векторизованный расчет индикатора на диапазоне баров.
+        Vectorized indicator calculation over a range of bars.
         
-        Это основной метод для runonce режима. Должен быть переопределен
-        в наследниках для реализации логики индикатора.
+        This is the main method for runonce mode. Subclasses should override
+        it to implement indicator logic.
         
         Args:
-            start (int): Начальный индекс (включительно)
-            end (int): Конечный индекс (не включительно)
+            start (int): Start index (inclusive)
+            end (int): End index (exclusive)
         
-        Пример:
+        Example:
             def once(self, start, end):
                 src = self.data.close.array
                 dst = self.lines.myline.array
                 
                 for i in range(start, end):
-                    dst[i] = src[i] * 2  # Удвоение цены
+                    dst[i] = src[i] * 2  # Double the price
         
         Note:
-            Для доступа к данным используйте .array вместо [i]:
+            Use .array instead of [i] to access data:
             - src = self.data.close.array  # numpy array
-            - dst[i] = src[i]  # прямой доступ к массиву
+            - dst[i] = src[i]  # direct array access
         """
-        pass  # Переопределяется в наследниках
+        pass  # Overridden in subclasses
     
     def next(self):
         """
-        Расчет индикатора для текущего бара.
+        Calculate the indicator for the current bar.
         
-        Fallback метод, вызывается только если once() не переопределен.
-        Для Aurora рекомендуется переопределять once() вместо next().
+        Fallback method, called only if once() is not overridden.
+        For Aurora, overriding once() is recommended instead of next().
         
-        Пример:
+        Example:
             def next(self):
                 self.lines.myline[0] = self.data.close[0] * 2
         """
-        pass  # Переопределяется в наследниках
+        pass  # Overridden in subclasses
     
     def prenext(self):
         """
-        Вызывается до достижения minperiod.
+        Called before minperiod is reached.
         
-        По умолчанию не делает ничего. Может быть переопределен
-        для специальной обработки "разогрева" индикатора.
+        Does nothing by default. Can be overridden for custom handling
+        of the indicator warm-up period.
         """
         pass
     
     def nextstart(self):
         """
-        Вызывается один раз при достижении minperiod.
+        Called once when minperiod is reached.
         
-        По умолчанию вызывает next(). Может быть переопределен
-        для специальной инициализации.
+        Calls next() by default. Can be overridden for custom initialization.
         """
         self.next()
     
-    # Методы для fallback режима (если once не переопределен)
+    # Methods for fallback mode (if once is not overridden)
     
     def once_via_next(self, start, end):
         """
-        Эмуляция once() через вызовы next().
+        Emulate once() through calls to next().
         
-        Используется автоматически, если once() не переопределен,
-        но next() переопределен.
+        Used automatically if once() is not overridden,
+        but next() is overridden.
         
-        Внимание: Медленнее чем нативный once()!
+        Note: Slower than a native once() implementation!
         """
         for i in range(start, end):
-            # Продвинуть данные
+            # Advance the data
             for data in self.datas:
                 data.advance()
             
-            # Продвинуть зависимые индикаторы
+            # Advance dependent indicators
             for indicator in self._ind_iterator:
                 indicator.advance()
             
-            # Продвинуть себя и вызвать next()
+            # Advance this indicator and call next()
             self.advance()
             self.next()
     
     def preonce_via_prenext(self, start, end):
         """
-        Эмуляция preonce() через вызовы prenext().
+        Emulate preonce() through calls to prenext().
         """
         for i in range(start, end):
             for data in self.datas:
@@ -241,7 +234,7 @@ class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
     
     def oncestart_via_nextstart(self, start, end):
         """
-        Эмуляция oncestart() через вызов nextstart().
+        Emulate oncestart() through a call to nextstart().
         """
         for i in range(start, end):
             for data in self.datas:
@@ -253,18 +246,18 @@ class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
             self.advance()
             self.nextstart()
     
-    # Утилиты для работы с numpy
+    # NumPy utilities
     
     def get_array(self, line, length=None):
         """
-        Получить numpy array из line.
+        Get a NumPy array from a line.
         
         Args:
-            line: Line object (например, self.data.close)
-            length (int, optional): Длина массива. Если None, вся доступная длина.
+            line: Line object (for example, self.data.close)
+            length (int, optional): Array length. If None, use the full available length.
         
         Returns:
-            np.ndarray: Numpy массив с данными
+            np.ndarray: NumPy array containing the data
         
         Example:
             close_array = self.get_array(self.data.close)
@@ -273,7 +266,7 @@ class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
         if hasattr(line, 'array'):
             arr = line.array
         elif hasattr(line, 'get'):
-            # Fallback для стандартных LineBuffer
+            # Fallback for standard LineBuffer objects
             arr = np.array([line.get(ago=i) for i in range(len(line))])
         else:
             raise TypeError(f"Cannot extract array from {type(line)}")
@@ -284,25 +277,25 @@ class AuroraIndicator(with_metaclass(MetaAuroraIndicator, IndicatorBase)):
     
     def set_array(self, line, array, start=0):
         """
-        Установить значения из numpy array в line.
+        Set line values from a NumPy array.
         
         Args:
-            line: Line object для записи
-            array (np.ndarray): Массив значений
-            start (int): Начальный индекс для записи
+            line: Line object to write to
+            array (np.ndarray): Array of values
+            start (int): Start index for writing
         
         Example:
             result = np.mean(close_array)
             self.set_array(self.lines.sma, result, start=self.p.period-1)
         """
         if hasattr(line, 'array'):
-            # Aurora LineBuffer - прямая запись
+            # Aurora LineBuffer - direct write
             line.array[start:start+len(array)] = array
         else:
-            # Fallback для стандартных LineBuffer
+            # Fallback for standard LineBuffer objects
             for i, val in enumerate(array):
                 line[i - len(line) + start] = val
 
 
-# Алиасы для совместимости
+# Aliases for compatibility
 Indicator = AuroraIndicator
