@@ -28,6 +28,7 @@ import inspect
 #from .utils.py3 import with_metaclass
 from .lineseries import LineSeries
 from .utils import AutoOrderedDict, OrderedDict, date2num
+from .utils.datasync import synchronize_activated_data
 
 
 class TimeFrame(object):
@@ -65,6 +66,7 @@ class DataSeries(LineSeries):
     _timeframe = TimeFrame.Days
     _is_on = True
     _is_end = False
+    _activation_dt = None
 
     Close, Low, High, Open, Volume, OpenInterest, DateTime = range(7)
 
@@ -76,7 +78,10 @@ class DataSeries(LineSeries):
 
     @is_on.setter
     def is_on(self, value: bool):
+        was_on = self._is_on
         self._is_on = value
+        if value and not was_on:
+            synchronize_activated_data(self)
 
     @property
     def is_end(self) -> bool:

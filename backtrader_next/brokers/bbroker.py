@@ -1086,6 +1086,19 @@ class BackBroker(bt.BrokerBase):
     def _try_exec(self, order):
         data = order.data
 
+        # An activated sparse feed may still point to a historical bar until
+        # its next timestamp arrives. Do not match orders against that bar.
+        activation_dt = getattr(data, '_activation_dt', None)
+        if activation_dt is not None:
+            if not len(data):
+                return
+            if data.datetime[0] <= activation_dt:
+                synchronizer = getattr(self.cerebro, '_data_sync', None)
+                # Activation before broker processing (cheat_on_open) may
+                # legitimately trade a bar matching the current engine clock.
+                if synchronizer is None or data.datetime[0] != synchronizer.datetime:
+                    return
+
         #?? OLD SLOW
         # popen = getattr(data, 'tick_open', None)
         # if popen is None:

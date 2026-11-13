@@ -46,6 +46,7 @@ from . import observers
 from . import analyzers
 from .writer import WriterFile
 from .utils import OrderedDict, tzparse, num2date, date2num
+from .utils.datasync import DataSynchronizer
 from .strategy import Strategy, SignalStrategy
 from .tradingcal import (TradingCalendarBase, TradingCalendar, PandasMarketCalendar)
 from .timer import Timer
@@ -2372,6 +2373,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
             strat._once()
             strat.reset()  # strat called next by next - reset lines
 
+        with DataSynchronizer(self, runstrats) as synchronizer:
+            self._runonce_loop(runstrats, synchronizer)
+
+    def _runonce_loop(self, runstrats, synchronizer):
         # The default once for strategies does nothing and therefore
         # has not moved forward all datas/indicators/observers that
         # were homed before calling once, Hence no "need" to do it
@@ -2391,6 +2396,8 @@ class Cerebro(with_metaclass(MetaParams, object)):
             dt0 = min(dts)
             if dt0 == math.inf:
                 break  # no data delivers anything
+
+            synchronizer.datetime = dt0
 
             for i in range(ndatas):
                 if datas[i].is_on and dts[i] <= dt0:
@@ -2425,7 +2432,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 next_writers(runstrats)
 
             for i in range(ndatas):
-                if datas[i].is_on and (dts[i] <= dt0 or dts[i] == math.inf):
+                if not datas[i].is_on:
+                    dts[i] = math.inf
+                elif dts[i] <= dt0 or dts[i] == math.inf:
                     dts[i] = datas[i].advance_peek()
 
 
