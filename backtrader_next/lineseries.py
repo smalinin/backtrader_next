@@ -624,6 +624,12 @@ class LineSeriesStub(LineSeries):
             return self  # a no-op must not suppress a cursor's actual owner
         return getattr(self.lines[0], '_once_cursor', self)
 
+    @property
+    def _clock(self):
+        # Preserve the wrapped line's dependency path. In particular, a line
+        # action owned by a strategy can be driven by a secondary feed.
+        return self.lines[0]
+
     # Only execute the operations below if the object is not a slave
     def forward(self, value=NAN, size=1):
         if not self.slave:

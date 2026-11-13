@@ -10,8 +10,9 @@ from ._lifecycle import CleanupOnExit
 class AuroraStrategy(Strategy):
     """Use Strategy's trading and lifecycle APIs with Aurora feeds/indicators.
 
-    Native indicators follow preloaded feed cursors; check their values after
-    warmup. Standard bt.ind.* and bt.nind.* indicators remain unsupported.
+    Native indicators follow preloaded feed cursors and need explicit value
+    checks. Standard graphs have per-feed warmup; their public bt.ind.* and
+    bt.nind.* input adapters remain unsupported.
     See docs/aurora/README.md for strategy and order examples.
     """
 
@@ -19,6 +20,30 @@ class AuroraStrategy(Strategy):
     # Updates in _oncepost/_notify are assigned to each strategy instance.
     _aurora_min_period_reached = False
     _aurora_notify_lists = None
+
+    def _periodset(self):
+        # addminperiod() applies to the strategy clock (the first feed). Its
+        # datetime line retains this requirement independently of indicators
+        # registered on other feeds. Base Strategy maps graph periods to feeds.
+        strategy_period = self.lines.datetime._minperiod
+        super()._periodset()
+        self._minperiods[0] = max(self._minperiods[0], strategy_period)
+        self._minperiod = max(self._minperiod, strategy_period)
+
+    def _getminperstatus_once(self, dt0, dts=None):
+        # Use actual feed clocks; dts follows the engine's sorted feed order.
+        # An is_end feed is disabled before dispatch but still supplies its
+        # final bar. Other inactive feeds do not delay the active instruments.
+        deficits = [period - len(data)
+                    for data, period in zip(self.datas, self._minperiods)
+                    if data.is_on or (len(data) and data.datetime[0] == dt0)]
+        status = max(deficits, default=1)
+        if status <= 0:
+            # Equality can persist for several bars of another feed, and late
+            # activation can jump directly past zero. nextstart is still once.
+            status = -1 if self._aurora_min_period_reached else 0
+        self._minperstatus = status
+        return status, deficits
 
     def _oncepost(self, dt0, dts=None):
         """
@@ -44,16 +69,13 @@ class AuroraStrategy(Strategy):
         # Process notifications (orders, trades)
         self._notify()
         
-        # Fast minperiod check for single-data case
-        if not self._aurora_min_period_reached:
-            data = self.datas[0]
-            if len(data) >= self._minperiod:
-                self._aurora_min_period_reached = True
-                self.nextstart()
-            else:
-                self.prenext()
+        minperstatus, _ = self._getminperstatus_once(dt0, dts)
+        if minperstatus > 0:
+            self.prenext()
+        elif minperstatus == 0:
+            self._aurora_min_period_reached = True
+            self.nextstart()
         else:
-            # Main next() call - this is where strategy logic runs
             self.next()
         
         # Analyzers and observers - only if present
