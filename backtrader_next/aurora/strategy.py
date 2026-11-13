@@ -85,8 +85,6 @@ class AuroraStrategy(Strategy):
     # Class-level defaults ensure these are always found via normal attribute
     # lookup (before __getattr__ in lineseries delegates to self.lines)
     _aurora_min_period_reached = False
-    _aurora_analyzers = None
-    _aurora_observers = None
     _aurora_notify_lists = None  # lazily populated in _notify() for per-bar optimization
 
     # Override to add Aurora-specific initialization if needed
@@ -95,14 +93,12 @@ class AuroraStrategy(Strategy):
         Aurora-specific initialization hook.
         
         This method is called during strategy initialization and can be
-        overridden to add Aurora-specific setup logic. By default, it does nothing.
+        overridden to add Aurora-specific setup logic. The default resets
+        the warmup transition state.
         
         This is useful for Aurora-specific optimizations or setup that shouldn't
         affect strategies used in standard backtrader.
         """
-        # Cache frequently accessed attributes for performance
-        self._aurora_analyzers = None
-        self._aurora_observers = None
         self._aurora_min_period_reached = False
     
     def __init__(self):
@@ -112,10 +108,6 @@ class AuroraStrategy(Strategy):
         See start() for an example using Aurora simplified indicators.
         Inheriting this class does not enable standard Cerebro indicators.
         """
-        # Initialize Aurora-specific attributes BEFORE parent init
-        self._aurora_analyzers = None
-        self._aurora_observers = None
-        self._aurora_min_period_reached = False
         self._aurora_notify_lists = None  # lazy-init in _notify() for per-bar optimization
         
         super(AuroraStrategy, self).__init__()
