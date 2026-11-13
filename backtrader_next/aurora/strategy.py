@@ -46,18 +46,8 @@ class AuroraStrategy(Strategy):
         return status, deficits
 
     def _oncepost(self, dt0, dts=None):
-        """
-        Optimized _oncepost for Aurora - minimizes overhead per bar.
-        """
-        # Inline self.forward() → lineseries.forward() → lines.forward() → linebuffer.forward()
-        # The strategy has only one line (datetime), so we can inline 3 function call layers.
-        # Equivalent to self.forward() but saves 3 Python function calls per bar (× 226K = 678K)
-        lb = self.lines[0]   # datetime LineBuffer
-        lb.idx += 1
-        lb.lencount += 1
-        lb.array.append(lb.array[-1] if lb.array else float('nan'))  # extend with placeholder
-        
-        # Set current datetime (overwrites placeholder)
+        """Advance strategy lines and dispatch the current preloaded bar."""
+        self.forward()
         self.lines.datetime[0] = dt0
         # Cache raw float datetime so analyzers (eq.py) can use it
         # without calling num2date on every bar
