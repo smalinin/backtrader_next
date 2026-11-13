@@ -17,6 +17,8 @@ def _indicator_graph(owner):
             if id(indicator) not in nodes:
                 nodes[id(indicator)] = indicator
                 collect(indicator)
+        for observer in getattr(parent, '_obs_iterator', ()):
+            collect(observer)
 
     collect(owner)
     return nodes

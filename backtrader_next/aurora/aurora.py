@@ -148,6 +148,12 @@ class Aurora(with_metaclass(MetaParams, object)):
                 raise ValueError('Aurora supports only {}={!r}; got {!r}'.format(
                     name, expected, value))
 
+    def _disable_runonce(self, indicator=None):
+        name = type(indicator).__name__ if indicator is not None else 'The indicator'
+        raise NotImplementedError(
+            '{} requires runonce=False (_nextforce=True); Aurora supports only '
+            'runonce=True. Use Cerebro for stepping-only indicators.'.format(name))
+
     def _init_stcount(self):
         """Initialize strategy counter"""
         self.stcount = 0

@@ -1710,7 +1710,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
                     writer.next()
 
-    def _disable_runonce(self):
+    def _disable_runonce(self, indicator=None):
         '''API for lineiterators to disable runonce (see HeikinAshi)'''
         self._dorunonce = False
 

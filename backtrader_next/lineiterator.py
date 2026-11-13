@@ -224,20 +224,20 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
         return self._obs_iterator
 
     def addindicator(self, indicator):
-        # store in right queue
-        queues = (self._ind_iterator, self._strat_iterator, self._obs_iterator)
-        queues[indicator._ltype].append(indicator)
-
         # use getattr because line buffers don't have this attribute
         if getattr(indicator, '_nextforce', False):
             # the indicator needs runonce=False
             o = self
             while o is not None:
                 if o._ltype == LineIterator.StratType:
-                    o.cerebro._disable_runonce()
+                    o.cerebro._disable_runonce(indicator)
                     break
 
                 o = o._owner  # move up the hierarchy
+
+        # Register only after the engine has accepted the execution mode.
+        queues = (self._ind_iterator, self._strat_iterator, self._obs_iterator)
+        queues[indicator._ltype].append(indicator)
 
     def bindlines(self, owner=None, own=None):
         if not owner:
