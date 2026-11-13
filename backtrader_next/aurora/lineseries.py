@@ -64,43 +64,6 @@ from .linebuffer import AuroraLineBufferView
 NAN = float('NaN')
 
 
-class AuroraLineAlias:
-    """
-    Descriptor for accessing a specific column (line) from the shared array.
-    
-    This provides the interface: data.close, data.open, etc.
-    Each attribute access returns an AuroraLineBufferView for that column.
-    """
-    
-    def __init__(self, column_idx):
-        """
-        Initialize descriptor for a specific column.
-        
-        Args:
-            column_idx (int): Column index in the 2D array
-        """
-        self.column_idx = column_idx
-    
-    def __get__(self, obj, cls=None):
-        """Return the line view for this column."""
-        if obj is None:
-            return self
-        return obj.lines[self.column_idx]
-    
-    def __set__(self, obj, value):
-        """
-        Set value or create binding.
-        
-        This maintains compatibility with backtrader's line binding system.
-        """
-        if hasattr(value, 'addbinding'):
-            # It's a line, create a binding
-            value.addbinding(obj.lines[self.column_idx])
-        else:
-            # Direct value assignment at current position
-            obj.lines[self.column_idx][0] = value
-
-
 class AuroraLines:
     """
     Container for multiple lines sharing a single 2D numpy array.
@@ -415,27 +378,3 @@ class AuroraLinesSingle(AuroraLines):
     def __setitem__(self, ago, value):
         """Set value at position (shortcut for single line)."""
         self.line[ago] = value
-
-
-def create_aurora_lines(linenames, initdata=None):
-    """
-    Factory function to create AuroraLines with custom line names.
-    
-    Args:
-        linenames (tuple): Names of lines
-        initdata (np.ndarray, optional): Initial data
-    
-    Returns:
-        AuroraLines: New AuroraLines instance
-    
-    Example:
-        >>> lines = create_aurora_lines(('sma', 'ema', 'rsi'))
-        >>> lines.sma[0] = 100.0
-        >>> lines.ema[0] = 101.0
-    """
-    return AuroraLines(linenames=linenames, initdata=initdata)
-
-
-# Compatibility aliases
-Lines = AuroraLines
-LinesSingle = AuroraLinesSingle
