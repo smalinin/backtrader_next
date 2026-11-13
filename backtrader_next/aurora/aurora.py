@@ -573,11 +573,7 @@ class Aurora(with_metaclass(MetaParams, object)):
                         strat._addanalyzer(Eq, _name='eq')
 
                     for multi, obscls, obargs, obkwargs in self.observers:
-                        if multi:
-                            for data in self.datas:
-                                strat._addobserver(True, obscls, *obargs, data=data, **obkwargs)
-                        else:
-                            strat._addobserver(False, obscls, *obargs, **obkwargs)
+                        strat._addobserver(multi, obscls, *obargs, **obkwargs)
 
                     sizer, sargs_sz, skwargs_sz = self.sizers.get(idx, defaultsizer)
                     if sizer is not None:
@@ -612,7 +608,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         # Use the standard dependency calculation for registered graphs. Native
         # indicators are separate and need no standard buffer allocation.
         for strat in runstrats:
-            if strat._ind_iterator:
+            if strat._ind_iterator or strat._obs_iterator:
                 strat._once()
                 # Next-only parents can leave nested outputs advanced after
                 # calculation. All output clocks must start the trading loop

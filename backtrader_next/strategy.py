@@ -64,6 +64,7 @@ from .lineseries import LineSeriesStub
 from .metabase import ItemCollection, findowner
 from .trade import Trade
 from .utils import OrderedDict, AutoOrderedDict, AutoDictList
+from .utils.datasync import advance_indicators
 
 
 class MetaStrategy(StrategyBase.__class__):
@@ -299,7 +300,8 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
         Returns the created analyzer
         '''
         analyzer = ancls(*anargs, **ankwargs)
-        self._slave_analyzers.append(analyzer)
+        if analyzer._parent is None:
+            self._slave_analyzers.append(analyzer)
         return analyzer
 
     def _getanalyzer_slave(self, idx):
@@ -323,8 +325,8 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
             self.stats.append(obs, obsname)
             return
 
-        setattr(self.stats, obsname, list())
-        l = getattr(self.stats, obsname)
+        l = list()
+        self.stats.append(l, obsname)
 
         for data in self.datas:
             obs = obscls(data, *obsargs, **obskwargs)
@@ -438,6 +440,14 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
 
     def _next_observers(self, minperstatus, once=False):
         for observer in self._obs_iterator:
+            if once:
+                if len(self) > len(observer):
+                    if len(observer) < observer.buflen():
+                        observer.advance()
+                    else:
+                        observer.forward()
+                advance_indicators(observer)
+
             for analyzer in observer._analyzers:
                 if minperstatus < 0:
                     analyzer._next()
@@ -447,9 +457,6 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                     analyzer._prenext()
 
             if once:
-                if len(self) > len(observer):
-                    observer.forward()
-
                 if minperstatus < 0:
                     observer.next()
                 elif minperstatus == 0:
@@ -460,7 +467,14 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                 observer._next()
 
     def _next_analyzers(self, minperstatus, once=False):
-        for analyzer in self.analyzers:
+        # Observer-owned roots run immediately before their observer. Other
+        # slave analyzers follow the strategy, just like explicitly added ones.
+        seen = {id(analyzer) for observer in self._obs_iterator
+                for analyzer in observer._analyzers}
+        for analyzer in itertools.chain(self.analyzers, self._slave_analyzers):
+            if id(analyzer) in seen or analyzer._parent is not None:
+                continue
+            seen.add(id(analyzer))
             if minperstatus < 0:
                 analyzer._next()
             elif minperstatus == 0:

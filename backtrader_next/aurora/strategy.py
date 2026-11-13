@@ -78,14 +78,10 @@ class AuroraStrategy(Strategy):
         else:
             self.next()
         
-        # Analyzers and observers - only if present
-        if self.analyzers:
-            for analyzer in self.analyzers:
-                analyzer._next()
-        
-        if self.observers:
-            for observer in self.observers:
-                observer._next()
+        if self.analyzers or self._slave_analyzers:
+            self._next_analyzers(minperstatus, once=True)
+        if self._obs_iterator:
+            self._next_observers(minperstatus, once=True)
         
         self.clear()
 

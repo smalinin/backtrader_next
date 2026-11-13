@@ -27,6 +27,7 @@ import sys
 
 from .utils.py3 import with_metaclass, string_types
 from .utils import DotDict
+from .utils.datasync import home_indicators
 
 from .lineroot import LineRoot, LineSingle, _ArrayFeed
 from .linebuffer import LineActions, LineNum
@@ -217,7 +218,8 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
 
     def addindicator(self, indicator):
         # store in right queue
-        self._ind_iterator.append(indicator)
+        queues = (self._ind_iterator, self._strat_iterator, self._obs_iterator)
+        queues[indicator._ltype].append(indicator)
 
         # use getattr because line buffers don't have this attribute
         if getattr(indicator, '_nextforce', False):
@@ -310,6 +312,11 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
 
         for observer in self._obs_iterator:
             observer.forward(size=self.buflen())
+            # Prepare dependencies, without executing observer callbacks during
+            # preload. Observer output rows are written once per strategy bar.
+            for indicator in observer._ind_iterator:
+                indicator._once()
+            home_indicators(observer)
 
         for data in self.datas:
             data.home()

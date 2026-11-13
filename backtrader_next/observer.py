@@ -58,7 +58,9 @@ class Observer(with_metaclass(MetaObserver, ObserverBase)):
         self.next()
 
     def _register_analyzer(self, analyzer):
-        self._analyzers.append(analyzer)
+        # Children receive lifecycle calls recursively through their parent.
+        if analyzer._parent is None:
+            self._analyzers.append(analyzer)
 
     def _start(self):
         self.start()
