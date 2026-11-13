@@ -12,10 +12,26 @@ __all__ = ['MACD']
 
 @numba.njit
 def compute_macd_numba(closes, fast_alpha, fast_period, slow_alpha, slow_period, signal_alpha, signal_period):
+    if fast_period < 1 or slow_period < 1 or signal_period < 1:
+        raise ValueError('MACD periods must be positive')
+
+    n = len(closes)
+    signal = np.full(n, np.nan, dtype=np.float64)
+    macd_period = max(fast_period, slow_period)
+    if n < macd_period:
+        macd = np.full(n, np.nan, dtype=np.float64)
+        return macd, signal, macd - signal
+
     fast_ema = compute_ema_numba(closes, fast_alpha, fast_period)
     slow_ema = compute_ema_numba(closes, slow_alpha, slow_period)
     macd = fast_ema - slow_ema
-    signal = compute_ema_numba(macd, signal_alpha, signal_period)
+
+    # Seed the signal EMA using valid MACD values after both price EMAs warm up.
+    signal_start = macd_period - 1
+    if n - signal_start >= signal_period:
+        signal[signal_start:] = compute_ema_numba(
+            macd[signal_start:], signal_alpha, signal_period,
+        )
     hist = macd - signal
     return macd, signal, hist
 
@@ -27,6 +43,9 @@ class MACD(bt.Indicator):
       - macd = ema(data, fast_period) - ema(data, slow_period)
       - signal = ema(macd, signal_period)
       - hist = macd - signal
+
+    The MACD line starts after max(fast_period, slow_period) bars. Signal and
+    histogram require another signal_period - 1 bars; earlier values are NaN.
     '''
     lines = ('macd', 'signal', 'hist')
     params = (
@@ -40,11 +59,19 @@ class MACD(bt.Indicator):
     		     )    
 
     def __init__(self):
-        self.addminperiod(self.p.slow_period)
+        if self.p.fast_period < 1 or self.p.slow_period < 1 or self.p.signal_period < 1:
+            raise ValueError('MACD periods must be positive')
+        self._macd_period = max(self.p.fast_period, self.p.slow_period)
+        self.addminperiod(self._macd_period + self.p.signal_period - 1)
         self.fast_alpha = 2.0 / (self.p.fast_period + 1)
         self.slow_alpha = 2.0 / (self.p.slow_period + 1)
         self.signal_alpha = 2.0 / (self.p.signal_period + 1)
         self.min_size = max(self.p.fast_period, self.p.slow_period, self.p.signal_period) * 20 
+
+    def prenext(self):
+        # The MACD line becomes available before its signal and histogram.
+        if len(self.data) >= self._macd_period:
+            self.next()
 
 
     def next(self):
@@ -63,7 +90,9 @@ class MACD(bt.Indicator):
 
 
     def once(self, start, end):
-        if end - start == 1:
+        # Skip only oncestart: the main once call fills the entire history,
+        # even when there is just one bar after the minimum period.
+        if start == self._minperiod - 1:
             return
 
         closes = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
