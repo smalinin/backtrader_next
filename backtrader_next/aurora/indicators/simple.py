@@ -6,10 +6,11 @@ standard backtrader indicators but much simpler and faster. They sync automatica
 with data feed index, eliminating the need for manual advance() calls.
 """
 
-import sys
-import itertools
 import numpy as np
 from typing import Dict, Optional, Any
+
+from ...metabase import findowner
+from ...strategy import Strategy
 
 
 # ---------------------------------------------------------------------------
@@ -73,53 +74,6 @@ class _LineContainer:
 
     def _getlinealias(self, idx):
         return self._names[idx]
-
-
-def findowner(owned, target_class=None):
-    """
-    Find the owner of an object by traversing the Python call stack.
-    
-    Similar to backtrader's metabase.findowner(), this function walks up
-    the call stack to find an instance of the target class that can be
-    considered the owner of the current object.
-    
-    Args:
-        owned: The object looking for an owner
-        target_class: Class to look for (Strategy-like). If None, looks for
-                     any object with 'datas' attribute (duck typing for Strategy)
-    
-    Returns:
-        Owner object if found, None otherwise
-    
-    Example:
-        # Called from indicator __init__:
-        # Stack: Frame 0: __init__ (self=indicator)
-        #        Frame 1: Strategy.__init__ (self=Strategy)
-        # Returns: Strategy instance
-    """
-    # Start at level 2 to skip this function and the caller
-    for framelevel in itertools.count(2):
-        try:
-            frame = sys._getframe(framelevel)
-        except ValueError:
-            # Frame depth exceeded - no owner found
-            break
-        
-        # Look for 'self' in the frame's local variables
-        self_ = frame.f_locals.get('self', None)
-        if self_ is None or self_ is owned:
-            continue
-        
-        # If target_class specified, check isinstance
-        if target_class is not None:
-            if isinstance(self_, target_class):
-                return self_
-        else:
-            # Duck typing: if it has 'datas' attribute, it's likely a Strategy
-            if hasattr(self_, 'datas'):
-                return self_
-    
-    return None
 
 
 class PlottableWrapper:
@@ -259,14 +213,9 @@ class AuroraSimpleIndicator:
         # AuroraDataBase / AuroraLines have 'lines'.
         _is_line_view = not hasattr(data, 'lines')
 
-        # Auto-discover owner
-        if _is_line_view:
-            # Line view has no _owner slot; find owner via call stack
-            owner = findowner(self)
-        else:
-            if not hasattr(data, '_owner') or data._owner is None:
-                data._owner = findowner(self)
-            owner = getattr(data, '_owner', None)
+        # Resolve the constructing strategy for each indicator. Data can be
+        # shared by multiple strategies and reused across runs.
+        owner = findowner(self, Strategy)
 
         # Resolve the actual data feed for the plotter
         if _is_line_view:
