@@ -22,11 +22,13 @@
 
 from array import array
 from backtrader_next.utils.py3 import string_types, integer_types
+from backtrader_next.utils.datefilters import filter_dataframe_dates
 
 from backtrader_next import date2num
 import backtrader_next.feed as feed
 
 import numpy as np
+import pandas as pd
 
 
 class PandasDirectData(feed.DataBase):
@@ -133,6 +135,9 @@ class PandasData(feed.DataBase):
         - None: column not present
         - -1: autodetect
         - >= 0 or string: specific colum identifier
+
+      - ``fromdate`` and ``todate`` are inclusive. A ``datetime`` preserves
+        its time of day; a ``date`` includes the corresponding calendar day.
     '''
 
     params = (
@@ -208,20 +213,21 @@ class PandasData(feed.DataBase):
                 # all other cases -- used given index
                 self._colmapping[datafield] = defmapping
 
-        coldtime = self._colmapping['datetime']
-
-        if coldtime is None:
-            # standard index in the datetime
-            if self.p.fromdate is not None:
-                self.p.dataframe = self.p.dataframe[ self.p.dataframe.index.date >= self.p.fromdate ].copy()
-            if self.p.todate is not None:
-                self.p.dataframe = self.p.dataframe[ self.p.dataframe.index.date <= self.p.todate ].copy()
-        else:
-            # it's in a different column ... use standard column index
-            if self.p.fromdate is not None:
-                self.p.dataframe = self.p.dataframe[ self.p.dataframe[coldtime].dt.date >= self.p.fromdate ].copy()
-            if self.p.todate is not None:
-                self.p.dataframe = self.p.dataframe[ self.p.dataframe[coldtime].dt.date <= self.p.todate ].copy()
+        if self.p.fromdate is not None or self.p.todate is not None:
+            coldtime = self._colmapping['datetime']
+            if coldtime is None:
+                datetimes = self.p.dataframe.index
+            else:
+                if isinstance(coldtime, string_types):
+                    if self.p.nocase:
+                        names = [c.lower() if isinstance(c, string_types) else c for c in colnames]
+                        coldtime = names.index(coldtime.lower())
+                    else:
+                        coldtime = colnames.index(coldtime)
+                datetimes = self.p.dataframe.iloc[:, coldtime]
+            self.p.dataframe = filter_dataframe_dates(
+                self.p.dataframe, datetimes, self.p.fromdate, self.p.todate,
+            )
 
     def reset(self):
         super(PandasData, self).reset()
@@ -338,7 +344,7 @@ class PandasData(feed.DataBase):
             tstamp = self.p.dataframe.iloc[:, coldtime]
 
         # convert to float via datetime and store it
-        dt = tstamp.to_pydatetime()
+        dt = pd.DatetimeIndex(tstamp).to_pydatetime()
         #self.lines.datetime.ndbuffer(np.array([date2num(v) for v in dt]))
         self.lines.datetime.ndbuffer(array('d', (date2num(v) for v in dt)))
 

@@ -77,6 +77,7 @@ from datetime import datetime, date
 
 from backtrader_next import TimeFrame
 from backtrader_next.utils import date2num
+from backtrader_next.utils.datefilters import filter_dataframe_dates
 
 from ..feed import AuroraDataBase
 
@@ -111,6 +112,9 @@ class AuroraPandasData(AuroraDataBase):
         nocase (bool): Case-insensitive column matching (default: True)
         fromdate (datetime/date): Filter start date (inclusive)
         todate (datetime/date): Filter end date (inclusive)
+
+    Datetime bounds preserve the exact time of day. Date-only bounds include
+    the corresponding calendar day, whether timestamps are in the index or a column.
     
     Column Specification:
         - None: column not present, use 0 or NaN
@@ -253,35 +257,8 @@ class AuroraPandasData(AuroraDataBase):
         
         # Apply date filters
         if self.p_fromdate is not None or self.p_todate is not None:
-            if dt_col is None:
-                # Filter by index
-                mask = pd.Series(True, index=df.index)
-                if self.p_fromdate is not None:
-                    if isinstance(df.index, pd.DatetimeIndex):
-                        mask &= df.index.date >= self.p_fromdate
-                    else:
-                        mask &= df.index >= self.p_fromdate
-                if self.p_todate is not None:
-                    if isinstance(df.index, pd.DatetimeIndex):
-                        mask &= df.index.date <= self.p_todate
-                    else:
-                        mask &= df.index <= self.p_todate
-                df = df[mask].copy()
-            else:
-                # Filter by datetime column
-                dt_series = df.iloc[:, dt_col]
-                mask = pd.Series(True, index=df.index)
-                if self.p_fromdate is not None:
-                    if hasattr(dt_series.dtype, 'tz'):
-                        mask &= dt_series.dt.date >= self.p_fromdate
-                    else:
-                        mask &= dt_series >= pd.Timestamp(self.p_fromdate)
-                if self.p_todate is not None:
-                    if hasattr(dt_series.dtype, 'tz'):
-                        mask &= dt_series.dt.date <= self.p_todate
-                    else:
-                        mask &= dt_series <= pd.Timestamp(self.p_todate)
-                df = df[mask].copy()
+            datetimes = df.index if dt_col is None else df.iloc[:, dt_col]
+            df = filter_dataframe_dates(df, datetimes, self.p_fromdate, self.p_todate)
         
         n_rows = len(df)
         if n_rows == 0:
