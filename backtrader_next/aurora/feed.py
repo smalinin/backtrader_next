@@ -82,13 +82,14 @@ import math
 import numpy as np
 
 from backtrader_next import TimeFrame
+from backtrader_next.lineroot import _ArrayFeed
 from backtrader_next.utils import date2num, num2date
 from backtrader_next.utils.datasync import synchronize_activated_data
 
 from .lineseries import AuroraLines
 
 
-class AuroraDataBase:
+class AuroraDataBase(_ArrayFeed):
     """
     Base class for Aurora data feeds with unified index architecture.
     

@@ -28,7 +28,7 @@ import sys
 from .utils.py3 import with_metaclass, string_types
 from .utils import DotDict
 
-from .lineroot import LineRoot, LineSingle
+from .lineroot import LineRoot, LineSingle, _ArrayFeed
 from .linebuffer import LineActions, LineNum
 from .lineseries import LineSeries, LineSeriesMaker
 from .dataseries import DataSeries
@@ -52,16 +52,11 @@ class MetaLineIterator(LineSeries.__class__):
         lastarg = 0
         _obj.datas = []
         for arg in args:
-            # Check if this is an Aurora data feed by checking module name
-            # Aurora data feeds are from aurora.feed module and should NOT be wrapped
-            if hasattr(arg, '__class__') and 'aurora' in getattr(arg.__class__, '__module__', ''):
-                # This is an Aurora data feed - use it directly
-                _obj.datas.append(arg)
-                mindatas = max(0, mindatas - 1)
-                lastarg += 1
-                continue
             if isinstance(arg, LineRoot):
                 _obj.datas.append(LineSeriesMaker(arg))
+
+            elif isinstance(arg, _ArrayFeed):
+                _obj.datas.append(arg)
 
             elif not mindatas:
                 break  # found not data and must not be collected

@@ -37,6 +37,17 @@ from .utils.py3 import with_metaclass
 
 from . import metabase
 
+
+class _ArrayFeed:
+    """Feed interface for array backends independent of the LineRoot hierarchy.
+
+    Implementations provide the feed's line container, aliases, clock and
+    period metadata directly, without a LineSeries wrapper.
+    """
+
+    __slots__ = ()
+
+
 class MetaLineRoot(metabase.MetaParams):
     '''
     Once the object is created (effectively pre-init) the "owner" of this
