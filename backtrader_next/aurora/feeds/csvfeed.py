@@ -21,24 +21,12 @@
 #
 ###############################################################################
 """
-AuroraCSVData - Fast CSV file loader
+AuroraCSVData: CSV parsing followed by the Aurora pandas loader.
 
-This module provides an optimized CSV data feed for Aurora, utilizing
-pandas for fast CSV parsing and Aurora's unified index architecture.
-
-Key Features:
-------------
-1. **Fast Loading**: Uses pandas.read_csv for optimal performance
-2. **Flexible Format**: Support for various CSV formats and delimiters
-3. **Date Parsing**: Automatic datetime parsing with custom formats
-4. **Column Mapping**: Flexible column specification (index or name)
-5. **Missing Data**: Handles missing values gracefully
-
-Performance:
------------
-- Fast CSV parsing via pandas
-- Efficient conversion to numpy array
-- Minimal memory overhead
+CSV parsing uses pandas.read_csv with configurable delimiters, headers, column
+mapping and timestamp formats. The resulting DataFrame is converted into the
+same owned OHLCV matrix as AuroraPandasData; its feed line views share that
+matrix. The DataFrame and indicator outputs have separate storage.
 
 Usage:
 ------

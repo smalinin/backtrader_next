@@ -21,24 +21,15 @@
 #
 ###############################################################################
 """
-AuroraPandasData - Fast pandas DataFrame loader
+AuroraPandasData: mapped pandas input for preloaded Aurora backtests.
 
-This module provides an optimized pandas DataFrame data feed for Aurora,
-utilizing the unified index architecture and fast NumPy operations.
+The loader resolves named or indexed OHLCV columns, filters date boundaries,
+converts timestamps, and builds an owned float64 matrix. The source DataFrame
+has separate storage; feed line views share the loaded matrix. Missing volume
+and open-interest columns are filled with zero.
 
-Key Features:
-------------
-1. **Fast Loading**: Uses df.values for direct NumPy array creation
-2. **Column Mapping**: Flexible column name detection (case-insensitive)
-3. **Date Filtering**: Efficient fromdate/todate filtering
-4. **Type Safety**: Automatic type conversion and validation
-5. **Memory Efficient**: Single 2D array instead of separate buffers
-
-Performance:
------------
-- 6x faster than standard backtrader PandasData
-- Zero-copy when possible (via df.values)
-- Minimal memory overhead
+Use a DatetimeIndex by default or select the timestamp column explicitly.
+Timing and memory measurements are in docs/aurora/BENCHMARKS.md.
 
 Usage:
 ------
@@ -88,7 +79,7 @@ class AuroraPandasData(AuroraDataBase):
     
     This class loads data from a pandas DataFrame into Aurora's unified
     2D array format. It provides flexible column mapping with auto-detection
-    and efficient bulk loading via df.values.
+    and conversion to an owned float64 matrix shared by the feed's line views.
     
     Parameters:
         dataframe (pd.DataFrame): Source DataFrame with OHLCV data
@@ -413,7 +404,7 @@ if __name__ == '__main__':
     print("\n" + "=" * 70)
     print("Performance Benefits")
     print("=" * 70)
-    print(f"✓ Fast loading via df.values")
+    print(f"✓ Loaded matrix shared by feed line views")
     print(f"✓ Flexible column mapping (case-insensitive)")
     print(f"✓ Efficient date filtering")
     print(f"✓ Single 2D array: {data1.data.nbytes / 1024:.1f} KB for {data1._length} bars")

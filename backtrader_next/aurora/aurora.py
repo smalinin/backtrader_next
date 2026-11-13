@@ -54,7 +54,7 @@ class Aurora(with_metaclass(MetaParams, object)):
     - No live trading support
     - No replay/resample modes
     - No runnext mode (always runonce)
-    - Simplified timer API
+    - Engine/strategy timers, writers and cheat-on-open callbacks are unsupported
     - Standard indicator support is limited to preloaded runonce execution
     - Use AuroraStrategy and Aurora feeds; stepping-only indicators are unsupported
 
@@ -219,7 +219,8 @@ class Aurora(with_metaclass(MetaParams, object)):
         Add a Strategy class for execution
         
         Args:
-            strategy: AuroraStrategy subclass (not instance) using Aurora indicators
+            strategy: AuroraStrategy subclass (not instance) with standard
+                runonce graphs or native Aurora indicators
             *args: Positional arguments passed to strategy __init__
             **kwargs: Keyword arguments passed to strategy __init__
             

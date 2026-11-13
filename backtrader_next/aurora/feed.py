@@ -21,58 +21,32 @@
 #
 ###############################################################################
 """
-AuroraDataBase - Optimized data feed with unified index
+Aurora feeds: one preloaded OHLCV matrix with a shared cursor.
 
-This module provides the base class for Aurora data feeds, featuring
-a revolutionary architecture where all OHLCV lines share a single
-position index instead of having separate indices.
+The matrix has float64 columns (datetime, open, high, low, close, volume,
+openinterest). Feed lines are views over that matrix; the feed owns their
+current position. Preloaded shapes are fixed.
 
-Key Architecture:
-----------------
-Standard backtrader DataBase:
-    lines.datetime: LineBuffer (with own _idx)
-    lines.open: LineBuffer (with own _idx)
-    lines.high: LineBuffer (with own _idx)
-    ... etc (7 separate buffers, 7 indices)
+A feed's data[0] returns the current complete row. Named columns such as
+data.close[0] return scalar values; negative offsets read earlier bars.
+StandardData(data) provides the close-first standard line interface,
+expressions and delayed inputs. Standard indicators adapt Aurora feeds and
+feed-backed columns automatically. Orders and positions use the original feed.
 
-Aurora AuroraDataBase:
-    data: np.ndarray [rows x 7]   # Single 2D array
-    _idx: int                      # ONE shared index
-    lines: AuroraLines             # Container with views
+The engine normally preloads and advances its feeds. To inspect one directly:
 
-Benefits:
----------
-1. Memory efficiency: 5x reduction (single contiguous array)
-2. Cache locality: Better CPU cache utilization
-3. No synchronization: Single index = no coordination overhead
-4. Vectorization: NumPy operations can span all columns
-5. Numba-friendly: JIT compilation works seamlessly
+    from backtrader_next.aurora import AuroraPandasData
 
-API Compatibility:
------------------
-Exposes selected backtrader-style DataBase methods:
-- data.datetime[0], data.close[0], etc.
-- len(data), data.buflen()
-- advance(), home(), forward(), rewind()
-- Indexing: data[0] (current), data[-1] (previous)
+    data = AuroraPandasData(dataframe=df)
+    data.preload()
+    data.home()
+    data.advance()
+    print(data.close[0])
+    print(data[0])  # Complete datetime-first row
 
-Standard runonce indicators adapt this feed and its individual column views
-automatically. StandardData(feed) exposes standard column expressions and
-delays. Native indicators from backtrader_next.aurora.indicators also accept
-the feed directly.
-
-Usage:
-------
-    # Load from pandas DataFrame
-    data = AuroraPandasData(dataframe=df, name='AAPL')
-    
-    # Access data (same API as backtrader)
-    print(data.close[0])      # Current close
-    print(data.close[-1])     # Previous close
-    
-    # Navigation
-    data.advance()            # Move to next bar
-    data.home()               # Reset to start
+The shared seven-column matrix uses 56 bytes per bar, excluding source frames,
+outputs and Python metadata. Measurements and scope are documented in
+docs/aurora/BENCHMARKS.md.
 """
 
 from __future__ import (absolute_import, division, print_function,
