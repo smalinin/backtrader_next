@@ -10,7 +10,7 @@ from .utils import compute_ema_numba
 
 __all__ = ['MACD']
 
-@numba.njit
+@numba.njit(cache=True)
 def compute_macd_numba(closes, fast_alpha, fast_period, slow_alpha, slow_period, signal_alpha, signal_period):
     if fast_period < 1 or slow_period < 1 or signal_period < 1:
         raise ValueError('MACD periods must be positive')
@@ -89,13 +89,11 @@ class MACD(bt.Indicator):
 
 
 
-    def once(self, start, end):
-        # Skip only oncestart: the main once call fills the entire history,
-        # even when there is just one bar after the minimum period.
-        if start == self._minperiod - 1:
-            return
+    def oncestart(self, start, end):
+        pass
 
-        closes = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
+    def once(self, start, end):
+        closes = np.asarray(self.data.lines[0].array, dtype=np.float64)
 
         macd, signal, hist = compute_macd_numba(
             closes,
@@ -104,6 +102,5 @@ class MACD(bt.Indicator):
             self.signal_alpha, self.p.signal_period
         )
 
-        self.lines.macd.ndbuffer(macd)
-        self.lines.signal.ndbuffer(signal)
-        self.lines.hist.ndbuffer(hist)
+        for line, values in zip(self.lines, (macd, signal, hist)):
+            np.copyto(np.asarray(line.array), values)

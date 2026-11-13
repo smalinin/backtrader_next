@@ -18,6 +18,8 @@ class SMA(bt.Indicator):
     plotinfo = dict(subplot=False)
 
     def __init__(self):
+        if self.p.period < 1:
+            raise ValueError('SMA period must be positive')
         self.addminperiod(self.p.period)
 
     def next(self):
@@ -26,13 +28,12 @@ class SMA(bt.Indicator):
             series = series[-self.p.period:]
             self.lines.sma[0] = series.mean()
 
-    def once(self, start, end):
-        if end-start==1:
-            return
+    def oncestart(self, start, end):
+        # once() fills the complete history, including its first valid bar.
+        pass
 
-        series = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
-        period = self.p.period
-        vals = compute_sma_numba(series, period)
-        self.lines.sma.ndbuffer(vals)
+    def once(self, start, end):
+        series = np.asarray(self.data.lines[0].array, dtype=np.float64)
+        np.copyto(np.asarray(self.lines.sma.array), compute_sma_numba(series, self.p.period))
 
 

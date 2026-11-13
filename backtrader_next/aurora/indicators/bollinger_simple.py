@@ -4,7 +4,7 @@ Bollinger Bands indicator for Aurora - SIMPLIFIED VERSION
 
 import numpy as np
 from .simple import MultiLineIndicator
-from .sma import SMA
+from ...nind.utils import compute_bollinger_numba
 
 
 class BollingerBands(MultiLineIndicator):
@@ -44,17 +44,7 @@ class BollingerBands(MultiLineIndicator):
     
     @staticmethod
     def _calculate(close: np.ndarray, period: int, devfactor: float):
-        mid = SMA._calculate(close, period)
-        
-        # Calculate standard deviation
-        std = np.full(len(close), np.nan)
-        for i in range(period - 1, len(close)):
-            std[i] = np.std(close[i - period + 1:i + 1], ddof=0)
-        
-        top = mid + std * devfactor
-        bot = mid - std * devfactor
-        
-        return mid, top, bot
+        return compute_bollinger_numba(close, period, devfactor)
     
     def _getplotdata(self) -> dict:
         return self._lines

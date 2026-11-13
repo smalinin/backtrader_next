@@ -6,7 +6,7 @@ Simplified implementation with automatic synchronization and plotting support.
 
 import numpy as np
 from .simple import MultiLineIndicator
-from .ema import EMA
+from ...nind.macd import compute_macd_numba
 
 
 class MACD(MultiLineIndicator):
@@ -91,26 +91,10 @@ class MACD(MultiLineIndicator):
         """
         if fast_period < 1 or slow_period < 1 or signal_period < 1:
             raise ValueError('MACD periods must be positive')
-
-        # Calculate fast and slow EMAs
-        fast_ema = EMA._calculate(close, fast_period)
-        slow_ema = EMA._calculate(close, slow_period)
-        
-        # MACD = fast EMA - slow EMA
-        macd = fast_ema - slow_ema
-        
-        # Seed the signal only after both price EMAs have warmed up.
-        signal = np.full(len(macd), np.nan)
-        valid_start = max(fast_period, slow_period) - 1
-        if len(macd) - valid_start >= signal_period:
-            macd_valid = macd[valid_start:]
-            signal_temp = EMA._calculate(macd_valid, signal_period)
-            signal[valid_start:] = signal_temp
-        
-        # Histogram = MACD - Signal
-        histo = macd - signal
-        
-        return macd, signal, histo
+        return compute_macd_numba(
+            close, 2.0 / (fast_period + 1), fast_period,
+            2.0 / (slow_period + 1), slow_period,
+            2.0 / (signal_period + 1), signal_period)
     
     def _getplotdata(self) -> dict:
         """Return data for plotting"""

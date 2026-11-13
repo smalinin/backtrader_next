@@ -6,46 +6,8 @@ Uses Numba JIT compilation for fast calculation.
 """
 
 import numpy as np
-from numba import jit
+from ...nind.utils import compute_ema_numba
 from .simple import AuroraSimpleIndicator
-
-
-@jit(nopython=True, cache=True)
-def _calculate_ema_numba(close: np.ndarray, period: int) -> np.ndarray:
-    """
-    Numba-optimized EMA calculation.
-    
-    Args:
-        close: Close price array
-        period: EMA period
-    
-    Returns:
-        Numpy array of EMA values
-    """
-    n = len(close)
-    result = np.full(n, np.nan)
-    
-    if n == 0:
-        return result
-    
-    # Smoothing factor
-    k = 2.0 / (period + 1)
-    one_minus_k = 1.0 - k
-
-    # Seed: first EMA = SMA of first `period` values
-    if n < period:
-        return result
-
-    total = 0.0
-    for i in range(period):
-        total += close[i]
-    result[period - 1] = total / period
-
-    # EMA from period onward
-    for i in range(period, n):
-        result[i] = close[i] * k + result[i - 1] * one_minus_k
-
-    return result
 
 
 class EMA(AuroraSimpleIndicator):
@@ -90,12 +52,12 @@ class EMA(AuroraSimpleIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        self._values = self._input.calculate(_calculate_ema_numba, self._period)
+        self._values = self._input.calculate(self._calculate, self._period)
     
     @staticmethod
     def _calculate(close: np.ndarray, period: int) -> np.ndarray:
         """
-        Vectorized EMA calculation (non-Numba fallback).
+        Batch EMA calculation through the shared Numba kernel.
         
         Args:
             close: Close price array
@@ -104,7 +66,7 @@ class EMA(AuroraSimpleIndicator):
         Returns:
             Numpy array of EMA values
         """
-        return _calculate_ema_numba(close, period)
+        return compute_ema_numba(close, 2.0 / (period + 1), period)
     
     def _getplotdata(self) -> dict:
         """Return data for plotting"""

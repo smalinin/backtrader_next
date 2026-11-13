@@ -7,32 +7,114 @@ import numpy as np
 import numba
 
 
-@numba.njit
+@numba.njit(cache=True)
 def compute_ema_numba(closes, alpha, period):
+    if period < 1:
+        raise ValueError('EMA period must be positive')
     n = len(closes)
-    result = np.empty(n, dtype=np.float64)
-    result[:period - 1] = np.nan
-    # Seed with simple average
-    result[period - 1] = np.mean(closes[:period])
-    # Recursive EMA
-    for i in range(period, n):
+    result = np.full(n, np.nan)
+    start = 0
+    while start < n and np.isnan(closes[start]):
+        start += 1
+    if n - start < period:
+        return result
+    total = 0.0
+    for i in range(start, start + period):
+        total += closes[i]
+    result[start + period - 1] = total / period
+    for i in range(start + period, n):
         result[i] = alpha * closes[i] + (1 - alpha) * result[i - 1]
     return result
 
-@numba.njit
+@numba.njit(cache=True)
 def compute_sma_numba(closes: np.ndarray, period: int):
+    if period < 1:
+        raise ValueError('SMA period must be positive')
     n = len(closes)
-    result = np.empty(n, dtype=np.float64)
+    result = np.full(n, np.nan)
+    start = 0
+    while start < n and np.isnan(closes[start]):
+        start += 1
+    if n - start < period:
+        return result
     cum = 0.0
-    for i in range(n):
+    for i in range(start, start + period):
         cum += closes[i]
-        if i >= period:
-            cum -= closes[i - period]
-        if i >= period - 1:
-            result[i] = cum / period
-        else:
-            result[i] = np.nan
+    result[start + period - 1] = cum / period
+    for i in range(start + period, n):
+        cum = cum - closes[i - period] + closes[i]
+        result[i] = cum / period
     return result
+
+
+@numba.njit(cache=True)
+def compute_rsi_numba(closes, period, safelow=100.0, safehigh=100.0):
+    """Wilder RSI; the caller selects the flat and rising zero-loss values."""
+    if period < 1:
+        raise ValueError('RSI period must be positive')
+    n = len(closes)
+    result = np.full(n, np.nan)
+    start = 0
+    while start < n and np.isnan(closes[start]):
+        start += 1
+    if n - start <= period:
+        return result
+    gain, loss = 0.0, 0.0
+    for i in range(start + 1, start + period + 1):
+        change = closes[i] - closes[i - 1]
+        if change > 0:
+            gain += change
+        else:
+            loss -= change
+    gain /= period
+    loss /= period
+    for i in range(start + period, n):
+        if i > start + period:
+            change = closes[i] - closes[i - 1]
+            gain = (gain * (period - 1) + max(change, 0.0)) / period
+            loss = (loss * (period - 1) + max(-change, 0.0)) / period
+        if loss == 0:
+            result[i] = safelow if gain == 0 else safehigh
+        else:
+            result[i] = 100.0 - 100.0 / (1.0 + gain / loss)
+    return result
+
+
+@numba.njit(cache=True)
+def compute_atr_numba(high, low, close, period, include_first=True):
+    """Wilder ATR, with explicit selection of the initial true-range sample."""
+    if period < 1:
+        raise ValueError('ATR period must be positive')
+    n = len(close)
+    result = np.full(n, np.nan)
+    start = 0
+    while start < n and np.isnan(close[start]):
+        start += 1
+    first = start if include_first else start + 1
+    if n - first < period:
+        return result
+    total = 0.0
+    for i in range(first, n):
+        true_range = high[i] - low[i]
+        if i > start:
+            true_range = max(true_range, abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
+        if i < first + period:
+            total += true_range
+            if i == first + period - 1:
+                result[i] = total / period
+        else:
+            result[i] = (result[i - 1] * (period - 1) + true_range) / period
+    return result
+
+
+@numba.njit(cache=True)
+def compute_bollinger_numba(closes, period, devfactor):
+    mid = compute_sma_numba(closes, period)
+    top, bot = np.full(len(closes), np.nan), np.full(len(closes), np.nan)
+    for i in range(period - 1, len(closes)):
+        deviation = np.std(closes[i - period + 1:i + 1]) * devfactor
+        top[i], bot[i] = mid[i] + deviation, mid[i] - deviation
+    return mid, top, bot
 
 
 @numba.njit

@@ -24,6 +24,9 @@ from .roc import *
 from .roofing_filter import *
 from .second_derivative import *
 from .sma import *
+from .rsi import *
+from .atr import *
+from .bollinger import *
 from .supersmoother import *
 from .ultimate_smoother import *
 from .ultimate_channel import *

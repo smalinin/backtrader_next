@@ -4,7 +4,6 @@
 #
 
 import numpy as np
-import numba
 import backtrader_next as bt
 from .utils import compute_ema_numba
 
@@ -26,24 +25,21 @@ class EMA(bt.Indicator):
     plotinfo = dict(subplot=False)
 
     def __init__(self):
+        if self.p.period < 1:
+            raise ValueError('EMA period must be positive')
         self.addminperiod(self.p.period)
         self.alpha = 2.0 / (self.p.period + 1)
-        self.min_size = self.p.period * 5
+
+    def nextstart(self):
+        self.lines.ema[0] = sum(self.data.get(size=self.p.period)) / self.p.period
 
     def next(self):
-        price = self.data[0]
-        if len(self.data) == self.p.period:
-            closes = self.data.get(size=self.p.period)
-            seed = sum(closes) / self.p.period
-            self.lines.ema[0] = seed
-        elif len(self.data) > self.p.period:
-            prev = self.lines.ema[-1]
-            self.lines.ema[0] = self.alpha * price + (1 - self.alpha) * prev
+        self.lines.ema[0] = self.alpha * self.data[0] + (1 - self.alpha) * self.lines.ema[-1]
+
+    def oncestart(self, start, end):
+        pass
 
     def once(self, start, end):
-        if end-start==1:
-            return
-
-        series = np.asarray(self.data.get_array_preloaded(), dtype=np.float64)
+        series = np.asarray(self.data.lines[0].array, dtype=np.float64)
         vals = compute_ema_numba(series, self.alpha, self.p.period)
-        self.lines.ema.ndbuffer(vals)
+        np.copyto(np.asarray(self.lines.ema.array), vals)

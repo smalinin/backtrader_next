@@ -4,58 +4,8 @@ Uses Numba JIT compilation for fast calculation.
 """
 
 import numpy as np
-from numba import jit
+from ...nind.utils import compute_atr_numba
 from .simple import AuroraSimpleIndicator
-
-
-@jit(nopython=True, cache=True)
-def _calculate_atr_numba(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
-    """
-    Numba-optimized ATR calculation.
-    
-    Args:
-        high: High price array
-        low: Low price array
-        close: Close price array
-        period: ATR period
-    
-    Returns:
-        Numpy array of ATR values
-    """
-    n = len(close)
-    result = np.full(n, np.nan)
-    
-    if n == 0:
-        return result
-    
-    # Calculate True Range
-    tr = np.zeros(n)
-    tr[0] = high[0] - low[0]
-    
-    for i in range(1, n):
-        hl = high[i] - low[i]
-        hc = abs(high[i] - close[i - 1])
-        lc = abs(low[i] - close[i - 1])
-        # Manual max for Numba
-        tr[i] = hl
-        if hc > tr[i]:
-            tr[i] = hc
-        if lc > tr[i]:
-            tr[i] = lc
-    
-    # Smooth TR using Wilder's method
-    if n >= period:
-        # Initial ATR = simple average
-        total = 0.0
-        for i in range(period):
-            total += tr[i]
-        result[period - 1] = total / period
-        
-        # Continue with smoothing
-        for i in range(period, n):
-            result[i] = (result[i - 1] * (period - 1) + tr[i]) / period
-    
-    return result
 
 
 class ATR(AuroraSimpleIndicator):
@@ -85,12 +35,12 @@ class ATR(AuroraSimpleIndicator):
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
         high, low, close = self._input.ohlc()
-        self._values = _calculate_atr_numba(high, low, close, self._period)
+        self._values = compute_atr_numba(high, low, close, self._period)
     
     @staticmethod
     def _calculate(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
-        """Non-Numba fallback."""
-        return _calculate_atr_numba(high, low, close, period)
+        """Batch ATR calculation through the shared Numba kernel."""
+        return compute_atr_numba(high, low, close, period)
     
     def _getplotdata(self) -> dict:
         return {'atr': self._values}
