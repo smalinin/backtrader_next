@@ -738,10 +738,17 @@ class Cerebro(with_metaclass(MetaParams, object)):
         Adds a ``Data Feed`` instance to the mix.
 
         If ``name`` is not None it will be put into ``data._name`` which is
-        meant for decoration/plotting purposes.
+        meant for decoration/plotting purposes. An unnamed feed receives
+        ``data0``, ``data1``, etc. based on its registration index, skipping
+        names already registered. Existing nonempty feed names are preserved.
         '''
         if name is not None:
             data._name = name
+        if not data._name:
+            index = len(self.datas)
+            while f'data{index}' in self.datasbyname:
+                index += 1
+            data._name = f'data{index}'
 
         self._dataid += 1
         data._id = self._dataid

@@ -192,7 +192,9 @@ class Aurora(with_metaclass(MetaParams, object)):
         
         Args:
             data: AuroraDataBase instance, such as AuroraPandasData or AuroraCSVData
-            name: Optional name for the data feed (for reference/plotting)
+            name: Optional name for the data feed (for reference/plotting).
+                Unnamed feeds receive data0, data1, etc. by registration index,
+                skipping occupied names. Existing nonempty feed names are kept.
             
         Returns:
             data: The added data feed instance
@@ -204,6 +206,11 @@ class Aurora(with_metaclass(MetaParams, object)):
         '''
         if name is not None:
             data._name = name
+        if not data._name:
+            index = len(self.datas)
+            while f'data{index}' in self.datasbyname:
+                index += 1
+            data._name = f'data{index}'
         
         self._dataid += 1
         data._id = self._dataid
