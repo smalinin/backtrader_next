@@ -599,19 +599,7 @@ class Aurora(with_metaclass(MetaParams, object)):
         return runstrats
     
     def _runonce(self, runstrats):
-        '''
-        Main backtesting loop in runonce mode - OPTIMIZED
-        
-        This is the core algorithm that:
-        1. Initializes all strategies (_once method)
-        2. Sorts data feeds by timeframe
-        3. Advances data in chronological order (checking is_on flag)
-        4. Notifies broker of fills/orders
-        5. Calls strategy _oncepost() methods with dt0 and dts
-        
-        Args:
-            runstrats: List of strategy instances to execute
-        '''
+        """Prepare indicator graphs and execute synchronized preloaded bars."""
         # Use the standard dependency calculation for registered graphs. Native
         # indicators are separate and need no standard buffer allocation.
         for strat in runstrats:
@@ -633,121 +621,16 @@ class Aurora(with_metaclass(MetaParams, object)):
             strat.reset()
         
         with DataSynchronizer(self, runstrats) as synchronizer:
-            # Keep activation and cleanup rules shared by both loop variants.
-            if len(self.datas) == 1:
-                self._runonce_single(runstrats, synchronizer)
-                return
-            self._runonce_multi(runstrats, synchronizer)
-    
-    def _runonce_single(self, runstrats, synchronizer):
-        '''
-        Optimized loop for single data feed - most common case
-        
-        Removes overhead of multi-data synchronization.
-        '''
-        data = self.datas[0]
-        broker_notify = self._brokernotify
-        
-        # Pre-calculate total bars for fast loop (use _length, not len() which depends on _idx)
-        total_bars = data._length
-        
-        # Cache strategy methods
-        strat = runstrats[0] if len(runstrats) == 1 else None
-        
-        if strat is not None:
-            # Single strategy fast path
-            strat_oncepost = strat._oncepost
-            
-            for _ in range(total_bars):
-                # Inactive feeds must not drive the clock or broker.
-                if not data.is_on or not data.advance():
-                    break
-                dt0 = data.lines.datetime[0]
-                synchronizer.datetime = dt0
-                # Match the multi-feed loop: process the final bar, then stop.
-                if data.is_end:
-                    data.is_on = False
-                
-                broker_notify()
-                
-                # Strategy tick
-                strat_oncepost(dt0, None)
-        else:
-            # Multiple strategies
-            for _ in range(total_bars):
-                if not data.is_on or not data.advance():
-                    break
-                dt0 = data.lines.datetime[0]
-                synchronizer.datetime = dt0
-                if data.is_end:
-                    data.is_on = False
-                
-                broker_notify()
-                
-                # Strategy ticks
-                for strat in runstrats:
-                    strat._oncepost(dt0, None)
-    
-    def _runonce_multi(self, runstrats, synchronizer):
-        '''
-        Loop for multiple data feeds with synchronization
-        '''
-        # Sort data feeds by timeframe and compression
-        datas = sorted(self.datas, key=lambda x: (x._timeframe, x._compression))
-        
-        # Get initial datetime peek for each data
-        dts = []
-        for data in datas:
-            try:
-                dt = data.advance_peek() if data.is_on else float('inf')
-                dts.append(dt)
-            except (AttributeError, StopIteration):
-                dts.append(float('inf'))
-        
-        broker_notify = self._brokernotify
-        ndatas = len(datas)
-        
-        # Main execution loop
-        while True:
-            # Find minimum datetime across all data feeds
-            dt0 = min(dts)
-            
-            # Exit if no more data
-            if dt0 == float('inf'):
-                break
+            self._runonce_loop(runstrats, synchronizer)
 
-            synchronizer.datetime = dt0
-            
-            # Advance data feeds that match current datetime and are active.
-            # is_end is checked only right after advance() — avoids 22x attribute
-            # lookups per bar for inactive feeds (4.75M saved over full run).
-            for i in range(ndatas):
-                if dts[i] <= dt0 and datas[i].is_on:
-                    try:
-                        datas[i].advance()
-                    except StopIteration:
-                        dts[i] = float('inf')
-                        datas[i].is_on = False
-                        continue
-                    if datas[i].is_end:
-                        dts[i] = float('inf')
-                        datas[i].is_on = False
-            
+    def _runonce_loop(self, runstrats, synchronizer):
+        """Process each delivered clock tick once, in broker/strategy order."""
+        broker_notify = self._brokernotify
+        strategy_ticks = tuple(strategy._oncepost for strategy in runstrats)
+        for dt0, dts in synchronizer.bars():
             broker_notify()
-            
-            # Call strategies with current datetime and all datetimes
-            for strat in runstrats:
-                strat._oncepost(dt0, dts)
-            
-            # Update datetime peek for advanced data feeds
-            for i in range(ndatas):
-                if not datas[i].is_on:
-                    dts[i] = float('inf')
-                elif dts[i] <= dt0 or dts[i] == float('inf'):
-                    try:
-                        dts[i] = datas[i].advance_peek()
-                    except (AttributeError, StopIteration):
-                        dts[i] = float('inf')
+            for oncepost in strategy_ticks:
+                oncepost(dt0, dts)
     
     def _brokernotify(self):
         notify_broker(self)

@@ -3,9 +3,10 @@
 # GPL 3.0 license <http://www.gnu.org/licenses/>
 #
 
-"""Synchronize feeds activated during a preloaded backtest."""
+"""Synchronize preloaded feed clocks and activation catch-up."""
 
 from bisect import bisect_right
+from math import inf
 
 
 def _indicator_graph(owner):
@@ -98,6 +99,74 @@ class DataSynchronizer:
         self.environment._data_sync = None
         for data in self.environment.datas:
             data._activation_dt = None
+
+    def bars(self):
+        """Iterate Aurora bars; leave broker/strategy dispatch to the engine."""
+        datas = self.environment.datas
+        if len(datas) == 1:
+            return self._single_bars(datas[0])
+        datas = sorted(datas, key=lambda data: (data._timeframe, data._compression))
+        return self._multi_bars(datas)
+
+    @staticmethod
+    def _peek(data):
+        if not data.is_on:
+            return inf
+        try:
+            return data.advance_peek()
+        except StopIteration:
+            return inf
+
+    @staticmethod
+    def _advance(data):
+        try:
+            delivered = data.advance()
+        except StopIteration:
+            delivered = False
+        if not delivered:
+            data.is_on = False
+            return False
+        # The final bar is still delivered to the broker and every strategy.
+        if data.is_end:
+            data.is_on = False
+        return True
+
+    def _single_bars(self, data):
+        peek, advance = self._peek, self._advance
+        while True:
+            dt0 = peek(data)
+            if dt0 == inf:
+                return
+            self.datetime = dt0
+            if not advance(data):
+                return
+            yield dt0, None
+
+    def _multi_bars(self, datas):
+        peek, advance = self._peek, self._advance
+        dts = [peek(data) for data in datas]
+        while True:
+            dt0 = min(dts)
+            if dt0 == inf:
+                return
+            self.datetime = dt0
+            delivered = False
+            for index, data in enumerate(datas):
+                if data.is_on and dts[index] <= dt0:
+                    if advance(data):
+                        delivered = True
+                        if not data.is_on:
+                            dts[index] = inf
+                    else:
+                        dts[index] = inf
+            if delivered:
+                yield dt0, dts
+            # Callbacks may disable a feed or activate/catch it up to this bar.
+            for index, data in enumerate(datas):
+                if not data.is_on:
+                    dts[index] = inf
+                elif dts[index] <= dt0 or dts[index] == inf:
+                    dts[index] = peek(data)
 
     def activate(self, data):
         if self.datetime is None:
