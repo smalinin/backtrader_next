@@ -87,16 +87,7 @@ class SMA(AuroraSimpleIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        # Support both a full data feed and a bare line view (e.g. data.close)
-        if hasattr(self._data, 'lines'):
-            # Full data feed: SMA(self.data, period=N)
-            close_line = self._data.lines.close
-            close_array = close_line.parent_array[:, close_line.column_idx]
-        else:
-            # Line view passed directly: SMA(self.data.close, period=N)
-            close_array = self._data.parent_array[:, self._data.column_idx]
-        # Use Numba-optimized calculation
-        self._values = _sma_numba(close_array, self._period)
+        self._values = self._input.calculate(_sma_numba, self._period)
     
     @staticmethod
     def _calculate(close: np.ndarray, period: int) -> np.ndarray:
@@ -113,12 +104,6 @@ class SMA(AuroraSimpleIndicator):
             Numpy array of SMA values
         """
         return _sma_numba(close, period)
-    
-    def _get_value_at(self, idx: int) -> float:
-        """Get SMA value at specific index"""
-        if idx < 0 or idx >= len(self._values):
-            return np.nan
-        return self._values[idx]
     
     def _getplotdata(self) -> dict:
         """Return data for plotting"""

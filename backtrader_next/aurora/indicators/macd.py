@@ -65,9 +65,8 @@ class MACD(MultiLineIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        # Get full close column from parent array
-        close = self._data.lines.close.parent_array[:, self._data.lines.close.column_idx]
-        macd, signal, histo = self._calculate(close, self._period_me1, self._period_me2, self._period_signal)
+        macd, signal, histo = self._input.calculate(
+            self._calculate, self._period_me1, self._period_me2, self._period_signal)
         
         # Store lines for multi-line access
         self._lines = {

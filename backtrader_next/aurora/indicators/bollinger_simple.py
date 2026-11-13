@@ -38,9 +38,7 @@ class BollingerBands(MultiLineIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        # Get full close column from parent array
-        close = self._data.lines.close.parent_array[:, self._data.lines.close.column_idx]
-        mid, top, bot = self._calculate(close, self._period, self._devfactor)
+        mid, top, bot = self._input.calculate(self._calculate, self._period, self._devfactor)
         
         self._lines = {'mid': mid, 'top': top, 'bot': bot}
     

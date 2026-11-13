@@ -7,10 +7,13 @@ with data feed index, eliminating the need for manual advance() calls.
 """
 
 import numpy as np
-from typing import Dict, Optional, Any
+from typing import Dict
 
 from ...metabase import findowner
 from ...strategy import Strategy
+from ..feed import AuroraDataBase
+from ..linebuffer import AuroraLineBufferView
+from ..lineseries import AuroraLines
 
 
 # ---------------------------------------------------------------------------
@@ -136,28 +139,6 @@ class PlottableWrapper:
             data = {}
         return _LineContainer(list(data.keys()), data)
 
-    # ------------------------------------------------------------------
-    # Legacy helpers (kept for backward compatibility)
-    # ------------------------------------------------------------------
-
-    def _getlines(self):
-        """Return pseudo-lines for older plotter code."""
-        data = self._indicator._getplotdata()
-        lines = type('Lines', (), {})()
-        if data:
-            for name, values in data.items():
-                setattr(lines, name, values)
-        return lines
-
-    def _getminperiod(self):
-        return self._indicator._getminperiod()
-
-    def _getplotinfo(self):
-        return self.plotinfo
-
-    def _getplotlines(self):
-        return self.plotlines
-
 
 class AuroraSimpleIndicator:
     """
@@ -165,70 +146,47 @@ class AuroraSimpleIndicator:
     
     Key features:
     - No inheritance from IndicatorBase (simpler, faster)
-    - Automatic synchronization via data._idx (no manual advance needed)
+    - Automatic synchronization via the resolved input clock
     - Full plotting support via PlottableWrapper
     - Vectorized calculations using NumPy
     - Multiple output lines supported
     
-    Subclasses must implement:
-    - _calculate(): compute indicator values
-    - _getplotdata(): return dict of line_name -> numpy array
-    
-    Example:
-        class SMA(AuroraSimpleIndicator):
-            plotinfo = dict(plot=True, subplot=False)
-            plotlines = dict(sma=dict(_name='SMA', color='blue'))
-            
-            def __init__(self, data, period=20):
-                super().__init__(data, period=period)
-                self._period = period
-                self._values = self._calculate(data.lines.close.array, period)
-            
-            @staticmethod
-            def _calculate(close, period):
-                # NumPy vectorized calculation
-                ...
+    Subclasses implement _do_calculate() and _getplotdata(). Use
+    self._input.calculate(kernel, ...) to preserve leading NaN warmup and
+    original bar alignment. Single-output subclasses populate self._values;
+    multi-output subclasses populate self._lines.
     """
     
     # Override in subclasses
     plotinfo = dict(plot=True, subplot=False)
     plotlines = dict()
+    _requires_ohlc = False
     
     def __init__(self, data, **kwargs):
         """
         Initialize the indicator.
 
         Args:
-            data: Aurora data feed OR a single line view (AuroraLineBufferView),
-                  e.g. ``SMA(self.data.close, period=20)``.
+            data: Aurora feed, line container/view, single-output indicator,
+                  or a selected output from a multi-line indicator.
             **kwargs: Additional parameters (stored in self._params)
         """
-        self._data = data
+        self._input = _IndicatorInput(data, require_ohlc=self._requires_ohlc)
+        self._clock = self._input.clock
+        self._data_feed = self._input.feed
         self._params = kwargs
         self._period = kwargs.get('period', 1)
         self._initialized = False  # Flag for lazy initialization
-
-        # Detect whether a full data feed or a bare line view was passed.
-        # AuroraLineBufferView uses __slots__ and has no 'lines' attribute;
-        # AuroraDataBase / AuroraLines have 'lines'.
-        _is_line_view = not hasattr(data, 'lines')
 
         # Resolve the constructing strategy for each indicator. Data can be
         # shared by multiple strategies and reused across runs.
         owner = findowner(self, Strategy)
 
-        # Resolve the actual data feed for the plotter
-        if _is_line_view:
-            parent_data = getattr(data, 'parent_data', None)  # AuroraLines
-            data_feed = getattr(parent_data, '_feed_ref', None)
-        else:
-            data_feed = data
-
         # Auto-register for plotting if owner (Strategy) exists
         if owner is not None:
             if not hasattr(owner, '_simple_indicators'):
                 owner._simple_indicators = []
-            wrapper = PlottableWrapper(self, data_feed=data_feed)
+            wrapper = PlottableWrapper(self, data_feed=self._data_feed)
             owner._simple_indicators.append(wrapper)
     
     def _ensure_initialized(self):
@@ -239,13 +197,19 @@ class AuroraSimpleIndicator:
     
     def _do_calculate(self):
         """Override in subclasses to perform actual calculation"""
-        pass
+        raise NotImplementedError('Subclasses must implement _do_calculate')
+
+    @property
+    def array(self):
+        """Return the full calculated output, including warmup NaNs."""
+        self._ensure_initialized()
+        return self._values
     
     def __getitem__(self, ago: int):
         """
         Access indicator values relative to current position.
         
-        Uses data._idx for automatic synchronization - no manual advance() needed!
+        Uses the resolved input clock; no manual advance is needed.
         
         Args:
             ago: Number of bars back (0 = current, -1 = previous, etc.)
@@ -259,25 +223,10 @@ class AuroraSimpleIndicator:
             self._initialized = True
         
         # Direct array access - fastest path
-        idx = self._data._idx + ago
+        idx = self._clock._idx + ago
         if 0 <= idx < len(self._values):
             return self._values[idx]
         return float('nan')
-    
-    def _get_value_at(self, idx: int) -> float:
-        """
-        Get indicator value at specific index.
-        
-        Override in subclasses with single-line indicators.
-        For multi-line indicators, override __getitem__ directly.
-        
-        Args:
-            idx: Absolute index in data
-        
-        Returns:
-            Indicator value or np.nan if out of bounds
-        """
-        raise NotImplementedError("Subclasses must implement _get_value_at or override __getitem__")
     
     def _getplotdata(self) -> Dict[str, np.ndarray]:
         """
@@ -300,8 +249,8 @@ class AuroraSimpleIndicator:
         return self._period
     
     def __len__(self) -> int:
-        """Return total length of indicator data"""
-        return len(self._data)
+        """Return the number of bars consumed by the input clock."""
+        return max(0, self._clock._idx + 1)
     
     def __repr__(self) -> str:
         """String representation"""
@@ -326,39 +275,39 @@ class MultiLineIndicator(AuroraSimpleIndicator):
             # Internal attributes
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
         
-        # Ensure calculation is done
-        self._ensure_initialized()
+        # Built-in output names are known without calculating the source.
+        # Dynamic custom outputs retain their calculation-time lookup.
+        if name not in self.plotlines:
+            self._ensure_initialized()
+            if not self._lines or name not in self._lines:
+                raise AttributeError(f"'{self.__class__.__name__}' has no line '{name}'")
+        return LineAccessor(self, name)
         
-        if self._lines and name in self._lines:
-            # Return a line accessor
-            return LineAccessor(self._data, self._lines[name])
-        
-        raise AttributeError(f"'{self.__class__.__name__}' has no line '{name}'")
-    
-    def _get_value_at(self, idx: int):
-        """Not used for multi-line indicators"""
-        raise NotImplementedError("MultiLineIndicator requires direct line access")
+    @property
+    def array(self):
+        raise TypeError('Select a named output line from a multi-line indicator')
 
 
 class LineAccessor:
     """
     Accessor for a single line in a multi-line indicator.
     
-    Provides [ago] indexing synchronized with data._idx.
+    Provides [ago] indexing synchronized with the original input clock.
     """
     
-    def __init__(self, data, values: np.ndarray):
+    def __init__(self, indicator, name):
         """
         Args:
-            data: Data feed for index synchronization
-            values: Numpy array of line values
+            indicator: Native multi-line indicator owning the output
+            name: Selected output name
         """
-        self._data = data
-        self._values = values
+        self._indicator, self._name = indicator, name
+        self._clock = indicator._clock
+        self._data_feed = indicator._data_feed
     
     def __getitem__(self, ago: int) -> float:
         """
-        Get value at current position minus ago bars.
+        Get a value at the current position plus ago.
         
         Args:
             ago: Bars back from current position
@@ -366,16 +315,91 @@ class LineAccessor:
         Returns:
             Line value or np.nan if out of bounds
         """
-        idx = self._data._idx + ago
-        if idx < 0 or idx >= len(self._values):
+        idx = self._clock._idx + ago
+        values = self.array
+        if idx < 0 or idx >= len(values):
             return np.nan
-        return self._values[idx]
+        return values[idx]
     
     def __len__(self) -> int:
-        """Return line length"""
-        return len(self._values)
+        """Return the number of bars consumed by the input clock."""
+        return max(0, self._clock._idx + 1)
     
     @property
     def array(self) -> np.ndarray:
         """Direct access to underlying numpy array"""
-        return self._values
+        self._indicator._ensure_initialized()
+        return self._indicator._lines[self._name]
+
+
+class _IndicatorInput:
+    """Resolve native input storage, cursor owner and plotting feed once."""
+
+    def __init__(self, source, *, require_ohlc=False):
+        if isinstance(source, AuroraDataBase):
+            self.clock = self.feed = source
+            names = source._linenames
+        elif isinstance(source, AuroraLines):
+            self.feed = source._feed_ref
+            self.clock = self.feed if self.feed is not None else source
+            names = source._linenames
+            if not require_ohlc and len(names) != 1 and 'close' not in names:
+                raise TypeError('Select a named line from this AuroraLines container')
+        elif isinstance(source, AuroraLineBufferView):
+            self.clock = source._clock
+            self.feed = self.clock if isinstance(self.clock, AuroraDataBase) else None
+            names = ()
+        elif isinstance(source, MultiLineIndicator):
+            raise TypeError('Select a named output line from a multi-line indicator')
+        elif isinstance(source, (AuroraSimpleIndicator, LineAccessor)):
+            self.clock, self.feed = source._clock, source._data_feed
+            names = ()
+        else:
+            raise TypeError('Expected an Aurora feed, line container/view or native indicator output')
+
+        if require_ohlc and not {'high', 'low', 'close'}.issubset(names):
+            raise TypeError('ATR requires an Aurora feed or container with high, low and close')
+        self.source = source
+
+    def _lines(self):
+        if isinstance(self.source, AuroraDataBase):
+            if self.source.lines is None:
+                raise RuntimeError('Preload the Aurora feed before calculating indicators')
+            return self.source.lines
+        return self.source
+
+    @staticmethod
+    def _column(line):
+        return line.parent_array[:, line.column_idx]
+
+    def array(self):
+        """Get the full input without copying its numerical storage."""
+        if isinstance(self.source, (AuroraDataBase, AuroraLines)):
+            lines = self._lines()
+            line = lines.lines[0] if lines.size() == 1 else lines.close
+            return self._column(line)
+        if isinstance(self.source, AuroraLineBufferView):
+            return self._column(self.source)
+        return self.source.array
+
+    def ohlc(self):
+        lines = self._lines()
+        return tuple(self._column(getattr(lines, name)) for name in ('high', 'low', 'close'))
+
+    def calculate(self, kernel, *args):
+        """Calculate after leading NaNs, then restore the original bar offsets."""
+        values = self.array()
+        start = 0
+        if len(values) and np.isnan(values[0]):
+            valid = ~np.isnan(values)
+            start = int(valid.argmax()) if valid.any() else len(values)
+        result = kernel(values[start:], *args)
+        if not start:
+            return result
+
+        def aligned(output):
+            full = np.full(len(values), np.nan)
+            full[start:] = output
+            return full
+
+        return tuple(aligned(output) for output in result) if isinstance(result, tuple) else aligned(result)

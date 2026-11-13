@@ -73,6 +73,7 @@ class ATR(AuroraSimpleIndicator):
             pass
     """
     
+    _requires_ohlc = True
     plotinfo = dict(plot=True, subplot=True, plotname='ATR')
     plotlines = dict(atr=dict(_name='ATR', linewidth=1.5))
     
@@ -83,22 +84,13 @@ class ATR(AuroraSimpleIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        # Get full OHLC columns from parent array
-        high = self._data.lines.high.parent_array[:, self._data.lines.high.column_idx]
-        low = self._data.lines.low.parent_array[:, self._data.lines.low.column_idx]
-        close = self._data.lines.close.parent_array[:, self._data.lines.close.column_idx]
-        
+        high, low, close = self._input.ohlc()
         self._values = _calculate_atr_numba(high, low, close, self._period)
     
     @staticmethod
     def _calculate(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> np.ndarray:
         """Non-Numba fallback."""
         return _calculate_atr_numba(high, low, close, period)
-    
-    def _get_value_at(self, idx: int) -> float:
-        if idx < 0 or idx >= len(self._values):
-            return np.nan
-        return self._values[idx]
     
     def _getplotdata(self) -> dict:
         return {'atr': self._values}

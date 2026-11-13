@@ -116,9 +116,7 @@ class RSI(AuroraSimpleIndicator):
     
     def _do_calculate(self):
         """Perform actual calculation (called lazily on first access)"""
-        # Get full close column from parent array
-        close_array = self._data.lines.close.parent_array[:, self._data.lines.close.column_idx]
-        self._values = _calculate_rsi_numba(close_array, self._period)
+        self._values = self._input.calculate(_calculate_rsi_numba, self._period)
     
     @staticmethod
     def _calculate(close: np.ndarray, period: int) -> np.ndarray:
@@ -133,12 +131,6 @@ class RSI(AuroraSimpleIndicator):
             Numpy array of RSI values (0-100)
         """
         return _calculate_rsi_numba(close, period)
-    
-    def _get_value_at(self, idx: int) -> float:
-        """Get RSI value at specific index"""
-        if idx < 0 or idx >= len(self._values):
-            return np.nan
-        return self._values[idx]
     
     def _getplotdata(self) -> dict:
         """Return data for plotting"""
