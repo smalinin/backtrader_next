@@ -109,9 +109,11 @@ class Eq(bt.Analyzer):
         self.eq_df = None
         self.trades_df = None
         self.orders_df = None
+        self._trade_executions = {}
 
     def notify_trade(self, trade):
         if trade.isclosed:
+            self._trade_executions[trade.ref] = tuple(trade._execution_history)
             size = trade.peak_size * (1 if trade.long else -1)
             self.trades.append([trade.ref, trade.data._name, trade.tradeid, trade.commission,
                                 trade.pnl, trade.pnlcomm, trade.return_pct, trade.open_datetime(),

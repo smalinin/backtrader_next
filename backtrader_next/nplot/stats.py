@@ -11,6 +11,8 @@ import webbrowser
 from html import escape
 from pathlib import Path
 
+from ..utils.dateintern import date2num, num2date
+
 
 class Statistics(object):
     def __init__(self):
@@ -39,10 +41,16 @@ class Statistics(object):
                                         else 252)
         win_year = int(annual_trading_days)
         win_half_year = int(annual_trading_days // 2)
-        daily = df_eq['value'].resample('D').last().dropna()
+        equity = df_eq['value'].dropna()
+        daily = equity.resample('D').last().dropna()
         d_returns = daily.pct_change().dropna()
-        d_cum_returns = (1 + d_returns).cumprod() - 1
-        d_drawdown = ((daily / daily.cummax()) - 1) * 100
+        # Include the first partial day in period totals, but retain complete
+        # close-to-close daily returns for daily risk/volatility statistics.
+        period_returns = daily.pct_change()
+        if not daily.empty:
+            period_returns.iloc[0] = daily.iloc[0] / equity.iloc[0] - 1
+        d_cum_returns = equity / equity.iloc[0] - 1
+        d_drawdown = ((equity / equity.cummax()) - 1) * 100
         d_drawdown_details = _drawdown_details(d_drawdown)
 
         self.graphs.append(
@@ -66,7 +74,7 @@ class Statistics(object):
                 title="Cumulative Returns (Log Scaled) %", color="green", fill="tozeroy")
         )
 
-        d_eoy_returns = d_returns.resample('YE').apply(_comp) * 100
+        d_eoy_returns = period_returns.resample('YE').apply(_comp) * 100
         d_eoy_returns.index = d_eoy_returns.index.year
         self.graphs.append(
             create_bar(
@@ -74,7 +82,7 @@ class Statistics(object):
                 title="End of Year Returns %", color="dodgerblue")
         )
 
-        d_distribution_monthly = d_returns.resample('ME').apply(_comp) * 100
+        d_distribution_monthly = period_returns.resample('ME').apply(_comp) * 100
         self.graphs.append(
             create_bar(
                 x=d_distribution_monthly.index, y=d_distribution_monthly.values,
@@ -191,7 +199,8 @@ class Statistics(object):
 
         d_rolling_geomean = d_returns.rolling(window=win_half_year).apply(_expected_return, raw=False)
         d_rolling_ann_return_pct = ((1 + d_rolling_geomean) ** win_year - 1) * 100
-        d_rolling_window_max_drawdown = daily.rolling(window=win_half_year).apply(_window_max_drawdown_pct, raw=False)
+        rolling_risk = _rolling_drawdown_risk(equity, daily, win_half_year)
+        d_rolling_window_max_drawdown = rolling_risk['max_drawdown']
         d_rolling_calmar = d_rolling_ann_return_pct / d_rolling_window_max_drawdown.abs()
         d_rolling_calmar = d_rolling_calmar.where(d_rolling_window_max_drawdown != 0)
         fig = create_fig(
@@ -201,13 +210,13 @@ class Statistics(object):
             add_level(fig, x0=d_rolling_calmar.index[0], x1=d_rolling_calmar.index[-1], y0=1.0, y1=1.0)
         self.graphs.append(fig)
 
-        d_rolling_ulcer_index = daily.rolling(window=win_half_year).apply(_window_ulcer_index, raw=False)
+        d_rolling_ulcer_index = rolling_risk['ulcer_index']
         fig = create_fig(
             x=d_rolling_ulcer_index.index, y=d_rolling_ulcer_index.values,
             title="Rolling Ulcer Index (6-Months)", color="indianred", fill="tozeroy", height=350)
         self.graphs.append(fig)
 
-        d_rolling_max_drawdown = d_drawdown.rolling(window=win_half_year, min_periods=1).min()
+        d_rolling_max_drawdown = rolling_risk['max_drawdown']
         fig = create_fig(
             x=d_rolling_max_drawdown.index, y=d_rolling_max_drawdown.values,
             title="Rolling Max Drawdown (6-Months) %", color="crimson", fill="tozeroy", height=350)
@@ -216,7 +225,7 @@ class Statistics(object):
         d_time_under_water = _time_under_water(d_drawdown)
         fig = create_fig(
             x=d_time_under_water.index, y=d_time_under_water.values,
-            title="Time Under Water (Trading Days)", color="darkorange", fill="tozeroy", height=350)
+            title="Time Under Water (Calendar Days)", color="darkorange", fill="tozeroy", height=350)
         self.graphs.append(fig)
 
         trades_df = performance.gen_trades().copy()
@@ -290,7 +299,7 @@ class Statistics(object):
 
             trade_excursions = _compute_trade_excursions(performance, trades_df)
             excursions_df = pd.concat([trades_df.reset_index(drop=True), trade_excursions], axis=1)
-            excursions_df = excursions_df.dropna(subset=["mfe_pct", "mae_pct", "final_return_pct"], how="all")
+            excursions_df = excursions_df.dropna(subset=["mfe_pct", "mae_pct"], how="all")
             if excursions_df.empty:
                 fig = create_empty_fig(title="MFE/MAE vs Final Return %", height=420)
             else:
@@ -366,8 +375,8 @@ class Statistics(object):
         addons["Max Consecutive Wins"] = round(_consecutive_wins(d_returns), 0)
         addons["Max Consecutive Losses"] = round(_consecutive_losses(d_returns), 0)
         addons["Expected Daily [%]"] = round(_expected_return(d_returns) * 100, 2)
-        addons["Expected Monthly [%]"] = round(_expected_return(d_returns, aggregate="M") * 100, 2)
-        addons["Expected Yearly [%]"] = round(_expected_return(d_returns, aggregate="A") * 100, 2)
+        addons["Expected Monthly [%]"] = round(_expected_return(period_returns, aggregate="M") * 100, 2)
+        addons["Expected Yearly [%]"] = round(_expected_return(period_returns, aggregate="A") * 100, 2)
 
         fig_addons = go.Figure(data=[go.Table(
             header=dict(values=["Metric", "Value"], fill_color='lightgray'),
@@ -384,7 +393,7 @@ class Statistics(object):
 
 
         # EOY Returns
-        yoy = pd.DataFrame(_group_returns(d_returns, d_returns.index.year, compounded=True) * 100)
+        yoy = pd.DataFrame(_group_returns(period_returns, period_returns.index.year, compounded=True) * 100)
         yoy.columns = ["Return"]
         yoy["Cumulative"] = d_cum_returns.groupby(d_cum_returns.index.year).last()
         yoy["Return"] = yoy["Return"].round(2)
@@ -410,6 +419,12 @@ class Statistics(object):
         # Worst 10 Drawdowns
         d_drawdown_details = _drawdown_details(d_drawdown)
         dd_info = d_drawdown_details.sort_values(by="max drawdown", ascending=True)[:10]
+        dd_info = dd_info.copy()
+        dd_info['start'] = dd_info['start'].map(lambda dt: dt.isoformat(sep=' '))
+        dd_info['end'] = [end.isoformat(sep=' ') if recovered else 'Not recovered'
+                          for end, recovered in zip(dd_info['end'], dd_info['recovered'])]
+        dd_info['days'] = dd_info['days'].astype(float).round(4)
+        dd_info['max drawdown'] = dd_info['max drawdown'].astype(float).round(2)
         dd_info = dd_info[["start", "end", "max drawdown", "days"]]
         dd_info.columns = ["Started", "Recovered", "Drawdown", "Days"]
         fig_dd = go.Figure(data=[go.Table(
@@ -1410,48 +1425,28 @@ def _remove_outliers(returns, quantile=0.95):
     return returns[returns < returns.quantile(quantile)]
 
 def _drawdown_details(drawdown):
-    # mark no drawdown
-    no_dd = drawdown == 0
-    _cols = ("start", "valley", "end", "days", "max drawdown", "99% max drawdown",)
-
-    # extract dd start dates, first date of the drawdown
-    starts = ~no_dd & no_dd.shift(1)
-    starts = list(starts[starts.values].index)
-
-    # extract end dates, last date of the drawdown
-    ends = no_dd & (~no_dd).shift(1)
-    ends = ends.shift(-1, fill_value=False)
-    ends = list(ends[ends.values].index)
-
-    # no drawdown
-    if not starts:
-        return pd.DataFrame(index=[], columns=_cols)
-
-    # drawdown series begins in a drawdown
-    if ends and starts[0] > ends[0]:
-        starts.insert(0, drawdown.index[0])
-
-    # series ends in a drawdown fill with last date
-    if not ends or starts[-1] > ends[-1]:
-        ends.append(drawdown.index[-1])
-
-    # build dataframe from results
+    """Drawdown episodes from the preceding peak to recovery (or last bar)."""
+    columns = ("start", "valley", "end", "days", "max drawdown",
+               "99% max drawdown", "recovered")
+    drawdown = drawdown.dropna()
     data = []
-    for i, _ in enumerate(starts):
-        dd = drawdown[starts[i] : ends[i]]
-        clean_dd = -_remove_outliers(-dd, 0.99)
-        data.append(
-            (starts[i],  dd.idxmin(), ends[i],  (ends[i] - starts[i]).days + 1,  dd.min(),  clean_dd.min(),)
-        )
-
-    df = pd.DataFrame(data=data, columns=_cols)
-    df["days"] = df["days"].astype(int)
-    df["max drawdown"] = df["max drawdown"].astype(float).round(2)
-    df["99% max drawdown"] = df["99% max drawdown"].astype(float)
-    df["start"] = df["start"].dt.strftime("%Y-%m-%d")
-    df["end"] = df["end"].dt.strftime("%Y-%m-%d")
-    df["valley"] = df["valley"].dt.strftime("%Y-%m-%d")
-    return df
+    start = None
+    peak = 0
+    for pos, value in enumerate(drawdown):
+        if value < 0 and start is None:
+            start = peak
+        recovered = value >= 0
+        if start is not None and (recovered or pos == len(drawdown) - 1):
+            episode = drawdown.iloc[start:pos + 1]
+            begin, end = episode.index[0], episode.index[-1]
+            depths = -episode[episode < 0]
+            data.append((begin, episode.idxmin(), end,
+                         (end - begin).total_seconds() / 86400,
+                         episode.min(), -depths.quantile(0.99), recovered))
+            start = None
+        if recovered:
+            peak = pos
+    return pd.DataFrame(data, columns=columns)
 
 def _comp(returns):
     """Calculates total compounded returns"""
@@ -1545,104 +1540,195 @@ def _consecutive_losses(returns, aggregate=None, compounded=True):
     return _count_consecutive(returns).max()
 
 def _time_under_water(drawdown):
-    underwater = (drawdown < 0).astype(int)
-    return underwater.groupby((underwater == 0).cumsum()).cumsum()
+    """Elapsed calendar days since the latest observed equity peak."""
+    if drawdown.empty:
+        return pd.Series(index=drawdown.index, dtype=float)
+    peaks = pd.Series(drawdown.index, index=drawdown.index).where(drawdown >= 0)
+    peaks.iloc[0] = drawdown.index[0]
+    elapsed = (pd.Series(drawdown.index, index=drawdown.index) - peaks.ffill())
+    return elapsed.dt.total_seconds().div(86400).where(drawdown < 0, 0.0)
+
+
+def _rolling_drawdown_risk(equity, daily, window):
+    """Risk over daily-return windows, retaining all intraday equity points.
+
+    The preceding daily close anchors each window of ``window`` returns.
+    Prefix windows start at the first equity observation.
+    """
+    ends = equity.index.searchsorted(daily.index + pd.DateOffset(days=1), side='left') - 1
+    values = equity.to_numpy(dtype=float)
+    records = []
+    for day, end in enumerate(ends):
+        start = ends[day - window] if day >= window else 0
+        segment = values[start:end + 1]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            drawdown = (segment / np.maximum.accumulate(segment) - 1) * 100
+        records.append((np.min(drawdown), np.sqrt(np.mean(drawdown ** 2))))
+    return pd.DataFrame(records, index=daily.index,
+                        columns=['max_drawdown', 'ulcer_index'])
 
 def _compute_trade_excursions(performance, trades_df):
+    columns = ["mfe_pct", "mae_pct", "final_return_pct"]
     if trades_df.empty:
-        return pd.DataFrame(columns=["mfe_pct", "mae_pct", "final_return_pct"])
-
+        return pd.DataFrame(columns=columns)
     strategy = getattr(performance, "strategy", None)
-    if strategy is None:
-        return pd.DataFrame(np.nan, index=trades_df.index, columns=["mfe_pct", "mae_pct", "final_return_pct"])
-
+    executions = getattr(performance, '_trade_executions', {})
     price_frame_cache = {}
     records = []
     for trade in trades_df.itertuples(index=False):
-        price_frame = _trade_price_frame(strategy, trade.data_name, price_frame_cache)
         final_return_pct = trade.return_pct * 100
-        if price_frame is None or pd.isna(trade.priceopen) or trade.priceopen == 0:
+        fills = executions.get(trade.ref, ())
+        notional = getattr(trade, 'entry_notional', np.nan)
+        price_frame = _trade_price_frame(strategy, trade.data_name, price_frame_cache)
+        if price_frame is None or not fills or not np.isfinite(notional) or notional <= 0:
             records.append((np.nan, np.nan, final_return_pct))
             continue
+        mfe, mae = _execution_excursions(price_frame, fills)
+        records.append((mfe / notional * 100, mae / notional * 100, final_return_pct))
+    return pd.DataFrame(records, columns=columns)
 
-        trade_slice = price_frame.loc[(price_frame.index >= trade.dateopen) & (price_frame.index <= trade.dateclose)]
-        if trade_slice.empty:
-            records.append((np.nan, np.nan, final_return_pct))
-            continue
 
-        high_series = trade_slice["high"] if "high" in trade_slice else trade_slice["close"]
-        low_series = trade_slice["low"] if "low" in trade_slice else trade_slice["close"]
-        if trade.size >= 0:
-            mfe_pct = (high_series.max() / trade.priceopen - 1) * 100
-            mae_pct = (low_series.min() / trade.priceopen - 1) * 100
+def _execution_excursions(price_frame, fills):
+    """Gross realized + unrealized PnL, respecting changes in exposure.
+
+    OHLC cannot locate extrema relative to an intrabar fill. On such bars,
+    use only the open, actual executions and close, without guessing a path.
+    """
+    times = pd.DatetimeIndex([num2date(fill.dt) for fill in fills])
+    if not times.isin(price_frame.index).all():
+        return np.nan, np.nan
+    grouped = {}
+    for dt, fill in zip(times, fills):
+        grouped.setdefault(dt, []).append(fill)
+    bars = price_frame.loc[times.min():times.max()]
+    position = cost = realized = 0.0
+    mult = fills[0].mult
+    best = worst = 0.0
+
+    def observe(price):
+        nonlocal best, worst
+        pnl = realized + position * (price - cost) * mult
+        if np.isfinite(pnl):
+            best, worst = max(best, pnl), min(worst, pnl)
+
+    def execute(fill):
+        nonlocal position, cost, realized, mult
+        observe(fill.price)
+        position, cost, realized, mult = (
+            fill.position_size, fill.position_price, fill.pnl, fill.mult)
+        observe(fill.price)
+
+    for dt, bar in bars.iterrows():
+        events = grouped.get(dt, ())
+        for fill in events:
+            if fill.timing == 'open':
+                execute(fill)
+        observe(bar['open'])
+        if any(fill.timing not in ('open', 'close') for fill in events):
+            for fill in events:
+                if fill.timing not in ('open', 'close'):
+                    execute(fill)
         else:
-            mfe_pct = (trade.priceopen / low_series.min() - 1) * 100
-            mae_pct = (trade.priceopen / high_series.max() - 1) * 100
+            observe(bar['high'])
+            observe(bar['low'])
+        observe(bar['close'])
+        for fill in events:
+            if fill.timing == 'close':
+                execute(fill)
+    return best, worst
 
-        records.append((mfe_pct, mae_pct, final_return_pct))
-
-    return pd.DataFrame(records, columns=["mfe_pct", "mae_pct", "final_return_pct"])
 
 def _trade_price_frame(strategy, data_name, cache):
     if data_name in cache:
         return cache[data_name]
-
     try:
         data = strategy.getdatabyname(data_name)
     except (KeyError, AttributeError):
         cache[data_name] = None
         return None
 
-    frame = None
-    data_params = getattr(data, "p", None)
-    if data_params is not None:
-        dataframe = getattr(data_params, "dataframe", None)
-        dataname = getattr(data_params, "dataname", None)
-        if isinstance(dataframe, pd.DataFrame):
-            frame = dataframe.copy()
-        elif isinstance(dataname, pd.DataFrame):
-            frame = dataname.copy()
+    # Native buffers preserve feed filters, mappings and UTC conversion. They
+    # also support feeds without a pandas source, including Aurora's views.
+    frame = _buffer_price_frame(data)
+    if frame is None:
+        frame = _source_price_frame(data)
+    if frame is not None:
+        for field in ('open', 'high', 'low'):
+            frame[field] = frame[field].fillna(frame['close'])
+        frame = frame.dropna(subset=['close']).sort_index()
+    cache[data_name] = frame
+    return frame
 
+
+def _buffer_price_frame(data):
+    lines = getattr(data, 'lines', None)
+    if lines is None:
+        return None
+    size = data.buflen()
+    if not size or size < len(data):  # exactbars may discard earlier bars
+        return None
+    values = {}
+    for field in ('datetime', 'open', 'high', 'low', 'close'):
+        line = getattr(lines, field, None)
+        if line is None:
+            return None
+        array = getattr(line, 'array', None)
+        if array is None:
+            get_array = getattr(line, 'get_array', None)
+            array = get_array() if get_array is not None else None
+        if array is None or len(array) < size:
+            return None
+        values[field] = np.asarray(array, dtype=float)[:size]
+    datetimes = values.pop('datetime')
+    valid = np.isfinite(datetimes) & (datetimes >= 1)
+    frame = pd.DataFrame({key: val[valid] for key, val in values.items()},
+                         index=pd.DatetimeIndex([num2date(dt) for dt in datetimes[valid]]))
+    mapping = getattr(data, '_colmapping', {})
+    for field in ('open', 'high', 'low'):
+        if field in mapping and mapping[field] is None:
+            frame[field] = np.nan
+    return frame if not frame.empty else None
+
+
+def _source_price_frame(data):
+    params = getattr(data, 'p', None)
+    frame = next((source for source in (
+        getattr(data, 'dataframe', None), getattr(params, 'dataframe', None),
+        getattr(params, 'dataname', None)) if isinstance(source, pd.DataFrame)), None)
     if frame is None or frame.empty:
-        cache[data_name] = None
         return None
-
-    datetime_col = _resolve_trade_frame_column(frame, getattr(data, "_colmapping", {}), "datetime")
-    if datetime_col is not None:
-        frame = frame.set_index(datetime_col)
-
-    frame.index = pd.to_datetime(frame.index)
-    frame = frame.sort_index()
-
-    normalized = pd.DataFrame(index=frame.index)
-    close_col = _resolve_trade_frame_column(frame, getattr(data, "_colmapping", {}), "close")
-    if close_col is None:
-        cache[data_name] = None
+    mapping = dict(getattr(data, '_colmapping', {}))
+    mapping.setdefault('datetime', getattr(data, 'p_datetime', getattr(params, 'datetime', None)))
+    # Resolve numeric column positions before extracting the datetime column.
+    columns = {field: _resolve_trade_frame_column(frame, mapping, field)
+               for field in ('datetime', 'open', 'high', 'low', 'close')}
+    if columns['close'] is None:
         return None
-    normalized["close"] = pd.to_numeric(frame[close_col], errors="coerce")
+    datetimes = frame.index if columns['datetime'] is None else frame[columns['datetime']]
+    index = pd.DatetimeIndex(pd.to_datetime(datetimes))
+    if index.tz is None and getattr(data, '_tzinput', None) is not None:
+        index = index.tz_localize(data._tzinput)
+    if index.tz is not None:
+        index = index.tz_convert('UTC').tz_localize(None)
+    # Match the date-number precision used by execution timestamps.
+    index = pd.DatetimeIndex([num2date(date2num(dt)) for dt in index.to_pydatetime()])
+    return pd.DataFrame({field: pd.to_numeric(frame[column], errors='coerce').to_numpy()
+                         if column is not None else np.full(len(frame), np.nan)
+                         for field, column in columns.items() if field != 'datetime'}, index=index)
 
-    high_col = _resolve_trade_frame_column(frame, getattr(data, "_colmapping", {}), "high")
-    low_col = _resolve_trade_frame_column(frame, getattr(data, "_colmapping", {}), "low")
-    normalized["high"] = pd.to_numeric(frame[high_col], errors="coerce") if high_col is not None else normalized["close"]
-    normalized["low"] = pd.to_numeric(frame[low_col], errors="coerce") if low_col is not None else normalized["close"]
-    normalized = normalized.dropna(subset=["close"])
-
-    cache[data_name] = normalized
-    return normalized
 
 def _resolve_trade_frame_column(frame, mapping, field):
-    candidate = mapping.get(field) if isinstance(mapping, dict) else None
-    if isinstance(candidate, int):
+    if field in mapping and mapping[field] is None:
+        return None
+    candidate = mapping.get(field)
+    if isinstance(candidate, (int, np.integer)):
         if 0 <= candidate < len(frame.columns):
-            candidate = frame.columns[candidate]
-        else:
-            candidate = None
+            return frame.columns[candidate]
+        candidate = None
     if candidate in frame.columns:
         return candidate
-
-    field_lower = field.lower()
     for column in frame.columns:
-        if str(column).lower() == field_lower:
+        if str(column).lower() == str(candidate or field).lower():
             return column
     return None
 

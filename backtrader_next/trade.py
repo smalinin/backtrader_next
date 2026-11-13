@@ -22,9 +22,14 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import itertools
+from collections import namedtuple
 
 from .utils import AutoOrderedDict
 from .utils.date import num2date
+
+
+TradeExecution = namedtuple('TradeExecution',
+                           'dt size price position_size position_price pnl mult timing')
 
 
 class TradeHistory(AutoOrderedDict):
@@ -192,6 +197,7 @@ class Trade(object):
         self.entry_notional = 0.0
         # A nonzero constructor position gets its multiplier on the first update.
         self._initial_entry_value = self._entry_price_value
+        self._execution_history = []
 
         self.justopened = False
         self.isopen = False
@@ -253,7 +259,7 @@ class Trade(object):
         return self.data.num2date(self.dtclose, tz=tz, naive=naive)
 
     def update(self, order, size, price, value, commission, pnl,
-               comminfo):
+               comminfo, dt=None, timing='intrabar'):
         '''
         Updates the current trade. The logic does not check if the
         trade is reversed, which is not conceptually supported by the
@@ -345,6 +351,12 @@ class Trade(object):
         self.pnlcomm = self.pnl - self.commission
 
         self.value = comminfo.getvaluesize(self.size, self.price)
+
+        # Keep compact fills independently of the optional, heavier trade history.
+        execution_dt = self.data.datetime[0] if dt is None else dt
+        self._execution_history.append(TradeExecution(
+            execution_dt, size, price, self.size, self.price, self.pnl,
+            comminfo.p.mult, timing))
 
         # Update the history if needed
         if self.historyon:

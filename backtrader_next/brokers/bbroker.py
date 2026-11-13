@@ -878,6 +878,11 @@ class BackBroker(bt.BrokerBase):
                           comminfo.margin, pnl,
                           psize, pprice)
 
+            # Preserve fill timing for OHLC-based trade excursion statistics.
+            order.executed.exbits[-1].timing = (
+                'close' if dtcoc is not None or order.exectype == Order.Close
+                else 'open' if order.exectype == Order.Market else 'intrabar')
+
             order.addcomminfo(comminfo)
 
             self.notify(order)

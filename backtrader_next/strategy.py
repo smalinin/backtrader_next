@@ -619,7 +619,8 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                              exbit.closedvalue,
                              exbit.closedcomm,
                              exbit.pnl,
-                             comminfo=order.comminfo)
+                             comminfo=order.comminfo, dt=exbit.dt,
+                             timing=getattr(exbit, 'timing', 'intrabar'))
 
                 if trade.isclosed:
                     self._tradespending.append(copy.copy(trade))
@@ -639,7 +640,8 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
                              exbit.openedvalue,
                              exbit.openedcomm,
                              exbit.pnl,
-                             comminfo=order.comminfo)
+                             comminfo=order.comminfo, dt=exbit.dt,
+                             timing=getattr(exbit, 'timing', 'intrabar'))
 
                 # This extra check covers the case in which different tradeid
                 # orders have put the position down to 0 and the next order
