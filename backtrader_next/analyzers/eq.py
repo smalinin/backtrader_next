@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8; py-indent-offset:4 -*-
+###############################################################################
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+###############################################################################
+
 from pandas import DataFrame
 
 import backtrader_next as bt

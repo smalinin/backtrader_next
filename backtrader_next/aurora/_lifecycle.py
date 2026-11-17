@@ -1,3 +1,14 @@
+#!/usr/bin/env python
+# -*- coding: utf-8; py-indent-offset:4 -*-
+###############################################################################
+#
+# Aurora - Optimized backtesting engine for backtrader_next
+#
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
+#
+###############################################################################
+
 """Run every shutdown callback while preserving the original exception."""
 
 

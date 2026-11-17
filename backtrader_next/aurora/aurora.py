@@ -2,15 +2,13 @@
 # -*- coding: utf-8; py-indent-offset:4 -*-
 ###############################################################################
 #
-# Aurora - Optimized Backtesting Engine
-# Copyright (C) 2026
+# Aurora - Optimized backtesting engine for backtrader_next
 #
-# Lightweight engine for backtesting trading strategies.
-# Works ONLY in runonce mode (vectorized computations).
-# Supports ONLY backtesting mode (no live trading).
-# Uses optimized AuroraDataFeed with unified index for all OHLCV elements.
+# Copyright (C) 2015-2023 Sergey Malinin
+# GPL 3.0 license <http://www.gnu.org/licenses/>
 #
 ###############################################################################
+
 from __future__ import (absolute_import, division, print_function, unicode_literals)
 
 import collections
